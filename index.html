@@ -1084,8 +1084,8 @@ const BRACKET_CHAIN = {
 };
 
 // Resolve a team slot recursively from predictions
-function resolveTeamSlot(slot, predictions, standings, thirdAssignments, depth=0) {
-  if(depth > 10) return slot; // prevent infinite recursion
+function resolveTeamSlot(slot, predictions, standings, thirdAssignments, depth=0, contextMid=null) {
+  if(depth > 10) return slot;
 
   // Group 1st/2nd place
   if(/^[12][A-L]$/.test(slot)) {
@@ -1094,31 +1094,33 @@ function resolveTeamSlot(slot, predictions, standings, thirdAssignments, depth=0
     return standings[g]?.[pos]?.team || slot;
   }
 
-  // 3rd place (resolved by thirdAssignments for that specific match)
-  if(slot === '3r') return slot; // handled at match level
+  // 3rd place slot - use contextMid to look up assignment
+  if(slot === '3r') {
+    if(contextMid && thirdAssignments[contextMid]) return thirdAssignments[contextMid];
+    return '?';
+  }
 
   // Winner of a match (Wm73 etc)
   if(slot.startsWith('W')) {
-    const mid = slot.slice(1); // e.g. 'm73'
+    const mid = slot.slice(1);
     const pred = predictions[mid];
     if(!pred) return '?';
     const chain = BRACKET_CHAIN[mid];
     if(!chain) return '?';
-    let winner;
+    let winSlot;
     if(pred.h > pred.a) {
-      winner = resolveTeamSlot(chain.h, predictions, standings, thirdAssignments, depth+1);
+      winSlot = chain.h;
     } else if(pred.a > pred.h) {
-      winner = resolveTeamSlot(chain.a, predictions, standings, thirdAssignments, depth+1);
+      winSlot = chain.a;
     } else {
-      // Draw in KO = penalties determine winner
       if(pred.ph !== undefined && pred.pa !== undefined) {
-        if(pred.ph > pred.pa) winner = resolveTeamSlot(chain.h, predictions, standings, thirdAssignments, depth+1);
-        else winner = resolveTeamSlot(chain.a, predictions, standings, thirdAssignments, depth+1);
+        winSlot = pred.ph > pred.pa ? chain.h : chain.a;
       } else {
-        winner = resolveTeamSlot(chain.h, predictions, standings, thirdAssignments, depth+1) + '(pen?)';
+        winSlot = chain.h;
       }
     }
-    return winner;
+    // Pass mid as context for 3r slots
+    return resolveTeamSlot(winSlot, predictions, standings, thirdAssignments, depth+1, mid);
   }
 
   // Runner up (loser of SF)
@@ -1128,20 +1130,19 @@ function resolveTeamSlot(slot, predictions, standings, thirdAssignments, depth=0
     if(!pred) return '?';
     const chain = BRACKET_CHAIN[mid];
     if(!chain) return '?';
-    let loser;
+    let loseSlot;
     if(pred.h > pred.a) {
-      loser = resolveTeamSlot(chain.a, predictions, standings, thirdAssignments, depth+1);
+      loseSlot = chain.a;
     } else if(pred.a > pred.h) {
-      loser = resolveTeamSlot(chain.h, predictions, standings, thirdAssignments, depth+1);
+      loseSlot = chain.h;
     } else {
       if(pred.ph !== undefined && pred.pa !== undefined) {
-        if(pred.ph > pred.pa) loser = resolveTeamSlot(chain.a, predictions, standings, thirdAssignments, depth+1);
-        else loser = resolveTeamSlot(chain.h, predictions, standings, thirdAssignments, depth+1);
+        loseSlot = pred.ph > pred.pa ? chain.a : chain.h;
       } else {
-        loser = '?';
+        loseSlot = chain.a;
       }
     }
-    return loser;
+    return resolveTeamSlot(loseSlot, predictions, standings, thirdAssignments, depth+1, mid);
   }
 
   return slot;
@@ -1163,13 +1164,13 @@ function getMatchTeams(match, predictions) {
   if(chain.h === '3r') {
     home = thirdAssignments[match.id] || match.home;
   } else {
-    home = resolveTeamSlot(chain.h, predictions, standings, thirdAssignments);
+    home = resolveTeamSlot(chain.h, predictions, standings, thirdAssignments, 0, match.id);
   }
 
   if(chain.a === '3r') {
     away = thirdAssignments[match.id] || match.away;
   } else {
-    away = resolveTeamSlot(chain.a, predictions, standings, thirdAssignments);
+    away = resolveTeamSlot(chain.a, predictions, standings, thirdAssignments, 0, match.id);
   }
 
   // Clean up unknown slots
