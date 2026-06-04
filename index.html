@@ -1948,6 +1948,143 @@ window.setPhase=function(phase){
 
 window.jumpTo=function(id){const i=allMatches.findIndex(m=>m.id===id);if(i!==-1){currentMatchIdx=i;currentPhaseFilter=allMatches[i].phase;renderMatch();}};
 
+function renderMatch(){
+  const match=allMatches[currentMatchIdx];
+  const predicted=Object.keys(userPredictions).length;
+  const total=allMatches.length;
+  const pct=Math.round((predicted/total)*100);
+  const cur=userPredictions[match.id];
+  const locked=isLocked();
+  const matchTeams=getMatchTeams(match, userPredictions);
+
+  const phaseConfig={
+    g:{bg:'linear-gradient(135deg,#1a5faf 0%,#0d3a6e 100%)',badge:'rgba(255,255,255,.15)',label:'Fase de Grupos'},
+    r32:{bg:'linear-gradient(135deg,#0f766e 0%,#065f46 100%)',badge:'rgba(255,255,255,.2)',label:'Ronda de 32'},
+    oct:{bg:'linear-gradient(135deg,#7c3aed 0%,#4c1d95 100%)',badge:'rgba(255,255,255,.2)',label:'Octavos de Final'},
+    qf:{bg:'linear-gradient(135deg,#b45309 0%,#78350f 100%)',badge:'rgba(255,255,255,.2)',label:'Cuartos de Final'},
+    sf:{bg:'linear-gradient(135deg,#be185d 0%,#831843 100%)',badge:'rgba(255,255,255,.2)',label:'Semifinal'},
+    '3rd':{bg:'linear-gradient(135deg,#475569 0%,#1e293b 100%)',badge:'rgba(255,255,255,.2)',label:'3er Lugar'},
+    final:{bg:'linear-gradient(135deg,#b45309 0%,#92400e 100%)',badge:'rgba(255,255,255,.25)',label:'⭐ GRAN FINAL'},
+  };
+  const pc=phaseConfig[match.phase]||phaseConfig.g;
+  const phaseStyle=`background:${pc.bg}`;
+  const badgeStyle=`background:${pc.badge};border:1px solid rgba(255,255,255,.25)`;
+  const phaseLabel=pc.label;
+
+  const phaseTabs=PHASES.map(p=>{
+    const count=allMatches.filter(m=>m.phase===p.key&&userPredictions[m.id]!==undefined).length;
+    const total2=allMatches.filter(m=>m.phase===p.key).length;
+    const active=currentPhaseFilter===p.key?'active':'';
+    const allDone=count===total2;
+    return `<button class="phase-tab ${active}" data-phase="${p.key}" onclick="setPhase('${p.key}')">${p.label} ${count}/${total2}${allDone?'✓':''}</button>`;
+  }).join('');
+
+  const phaseMatches=allMatches.filter(m=>m.phase===currentPhaseFilter);
+  const savedMatches=phaseMatches.filter(m=>userPredictions[m.id]!==undefined);
+  let scrollHtml='';
+  if(savedMatches.length){
+    const items=savedMatches.map(m=>{
+      const sc=userPredictions[m.id],isCur=m.id===match.id;
+      const mt=getMatchTeams(m, userPredictions);
+      return `<div class="saved-card${isCur?' active-card':''}" onclick="jumpTo('${m.id}')">
+        <div class="saved-card-teams">
+          <div class="saved-card-team"><div class="saved-card-flag">${flag(mt.home)}</div><div class="saved-card-name">${mt.home}</div></div>
+          <div class="saved-card-vs"><div class="saved-card-score">${sc.h} - ${sc.a}</div><div class="saved-card-date">${m.date}</div></div>
+          <div class="saved-card-team"><div class="saved-card-flag">${flag(mt.away)}</div><div class="saved-card-name">${mt.away}</div></div>
+        </div><div class="saved-card-check">✓</div>
+      </div>`;
+    }).join('');
+    scrollHtml=`<div class="saved-scroll-wrap">
+      <div class="saved-scroll-header">
+        <span class="saved-scroll-title">Partidos guardados</span>
+        <span class="saved-scroll-count">${savedMatches.length}/${phaseMatches.length} en esta fase</span>
+      </div>
+      <div class="saved-scroll-list" id="savedScrollList">${items}</div>
+    </div>`;
+  }
+
+  const lockBannerEarly=locked?`<div class="lock-banner"><span class="lock-banner-icon">🔒</span><div><div class="lock-banner-text">La quiniela está cerrada</div><div class="lock-banner-sub">Ya no es posible modificar predicciones.</div></div></div>`:'';
+  const noPagoBanner=!userIsPaid?`<div class="no-pago-banner"><span class="npb-icon">💳</span><div class="npb-text">¡Recuerda realizar tu pago!<div class="npb-sub">Si no pagas antes del <strong>10 de junio</strong>, tu ranking aparecerá en 0.</div></div></div>`:'';
+
+  const viewToggleHtml=`<div class="view-toggle">
+    <button class="view-btn ${currentView==='one'?'active':''}" onclick="setView('one')">⚽ Vista 1 a 1</button>
+    <button class="view-btn ${currentView==='general'?'active':''}" onclick="setView('general')">📋 Vista General</button>
+  </div>`;
+
+  if(currentView==='general'){
+    document.getElementById('quinielaContainer').innerHTML=`
+      <div class="q-header-card">
+        <div class="q-greeting">Hola, <strong>${currentUser.displayName||currentUser.email}</strong> 👋</div>
+        <div class="q-title">Mi Quiniela · Mundial 2026</div>
+        <div class="progress-wrap"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div><div class="progress-pct">${pct}%</div></div>
+        <div class="progress-sub">${predicted} de ${total} partidos completados</div>
+      </div>
+      ${renderCountdownBanner()}
+      ${lockBannerEarly}${noPagoBanner}
+      <div class="phase-tabs">${phaseTabs}</div>
+      ${viewToggleHtml}
+      ${renderGeneralView(match)}`;
+    return;
+  }
+
+  const scoreSection=locked?
+    `<div class="score-section"><div class="score-section-label">Tu predicción</div><div class="score-inputs">
+      <div class="score-input-wrap"><div class="score-team-label">${flag(matchTeams.home)} ${matchTeams.home}</div><input class="score-input has-value" type="number" disabled value="${cur!==undefined?cur.h:'—'}" style="opacity:.7;cursor:not-allowed"></div>
+      <div class="score-separator"><div class="score-dash">:</div></div>
+      <div class="score-input-wrap"><div class="score-team-label">${flag(matchTeams.away)} ${matchTeams.away}</div><input class="score-input has-value" type="number" disabled value="${cur!==undefined?cur.a:'—'}" style="opacity:.7;cursor:not-allowed"></div>
+    </div></div>`:
+    `<div class="score-section"><div class="score-section-label">¿Cuál será el marcador final?</div><div class="score-inputs">
+      <div class="score-input-wrap"><div class="score-team-label">${flag(matchTeams.home)} ${matchTeams.home}</div><input class="score-input${cur?' has-value':''}" id="scoreH" type="number" min="0" max="20" placeholder="–" value="${cur!==undefined?cur.h:''}"></div>
+      <div class="score-separator"><div class="score-dash">:</div><div style="font-size:18px;opacity:.3">⚽</div></div>
+      <div class="score-input-wrap"><div class="score-team-label">${flag(matchTeams.away)} ${matchTeams.away}</div><input class="score-input${cur?' has-value':''}" id="scoreA" type="number" min="0" max="20" placeholder="–" value="${cur!==undefined?cur.a:''}"></div>
+    </div></div>`;
+
+  const actionsSection=locked?`<div class="edit-note" style="color:var(--red)">🔒 Quiniela cerrada — solo lectura</div>`:
+    `<div class="match-actions">
+      <button class="btn btn-secondary" onclick="prevMatch()" ${currentMatchIdx===0?'disabled':''}>← Anterior</button>
+      <button class="btn btn-primary" onclick="saveMatch()">${cur!==undefined?'💾 Actualizar':'Guardar y Siguiente →'}</button>
+    </div>
+    ${cur!==undefined?'<div class="edit-note">✏️ Ya guardaste este partido — toca para modificarlo</div>':''}`;
+
+  document.getElementById("quinielaContainer").innerHTML=`
+    <div class="q-header-card">
+      <div class="q-greeting">Hola, <strong>${currentUser.displayName||currentUser.email}</strong> 👋</div>
+      <div class="q-title">Mi Quiniela · Mundial 2026</div>
+      <div class="progress-wrap"><div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div><div class="progress-pct">${pct}%</div></div>
+      <div class="progress-sub">${predicted} de ${total} partidos completados</div>
+    </div>
+    ${renderCountdownBanner()}
+    ${lockBannerEarly}${noPagoBanner}
+    <div class="phase-tabs">${phaseTabs}</div>
+    ${viewToggleHtml}
+    ${scrollHtml}
+    <div class="match-card">
+      <div class="match-card-top" style="${phaseStyle}">
+        <div class="match-top-inner">
+          <span class="match-round-badge" style="${badgeStyle}">${phaseLabel} — ${match.round}</span>
+          <div class="match-num" style="color:rgba(255,255,255,.8)">Partido #${match.num} · ${match.date} ${match.time}</div>
+        </div>
+      </div>
+      <div class="match-card-body">
+        <div class="teams-row">
+          <div class="team-side"><div class="team-flag">${flag(matchTeams.home)}</div><div class="team-name">${matchTeams.home}</div></div>
+          <div class="vs-wrap"><div class="vs-text">VS</div><div class="vs-dot"></div></div>
+          <div class="team-side"><div class="team-flag">${flag(matchTeams.away)}</div><div class="team-name">${matchTeams.away}</div></div>
+        </div>
+        <div class="info-grid">
+          <div class="info-item"><div class="info-item-icon">📍</div><div class="info-item-label">Sede</div><div class="info-item-val">${match.venue}</div></div>
+          <div class="info-item"><div class="info-item-icon">📅</div><div class="info-item-label">Fecha</div><div class="info-item-val">${match.date}</div></div>
+          <div class="info-item"><div class="info-item-icon">🕐</div><div class="info-item-label">Hora</div><div class="info-item-val">${match.time} hrs</div></div>
+          <div class="info-item"><div class="info-item-icon">🔵</div><div class="info-item-label">Grupo/Fase</div><div class="info-item-val">${match.round}</div></div>
+        </div>
+        ${scoreSection}
+        ${actionsSection}
+      </div>
+    </div>`;
+
+  setTimeout(()=>{const el=document.getElementById('savedScrollList');if(el){const active=el.querySelector('.active-card');if(active)active.scrollIntoView({block:'nearest',behavior:'smooth'});}},100);
+}
+
 // Get classified teams from predictions for comparison
 function getClassifiedTeams(preds) {
   const standings = getAllStandings(preds);
