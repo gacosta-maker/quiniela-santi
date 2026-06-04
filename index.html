@@ -2175,58 +2175,58 @@ window.saveMatch=async function(){
 
   // Detect if group change affects KO predictions
   let affectedMatches=new Set();
-  if(match.phase==='g'){
-    const groupId=Object.keys(GROUP_MATCHES).find(g=>GROUP_MATCHES[g].includes(match.id));
-    if(groupId){
-      const predsBefore=Object.assign({},userPredictions);
-      const predsAfter=Object.assign({},userPredictions,{[match.id]:pred});
-      const standBefore=calcGroupStandings(groupId,predsBefore);
-      const standAfter=calcGroupStandings(groupId,predsAfter);
+  try{
+    if(match.phase==='g'){
+      const groupId=Object.keys(GROUP_MATCHES).find(g=>GROUP_MATCHES[g].includes(match.id));
+      if(groupId){
+        const predsBefore=Object.assign({},userPredictions);
+        const predsAfter=Object.assign({},userPredictions,{[match.id]:pred});
+        const standBefore=calcGroupStandings(groupId,predsBefore);
+        const standAfter=calcGroupStandings(groupId,predsAfter);
 
-      const pos1B=standBefore[0]?.team, pos1A=standAfter[0]?.team;
-      const pos2B=standBefore[1]?.team, pos2A=standAfter[1]?.team;
-      const pos3B=standBefore[2]?.team, pos3A=standAfter[2]?.team;
+        const pos1B=standBefore[0]?.team, pos1A=standAfter[0]?.team;
+        const pos2B=standBefore[1]?.team, pos2A=standAfter[1]?.team;
+        const pos3B=standBefore[2]?.team, pos3A=standAfter[2]?.team;
 
-      // If 1st place changed - find R32 match with slot 1+groupId
-      if(pos1B!==pos1A){
-        R32_BRACKET.forEach(r=>{
-          if(r.t1==='1'+groupId||r.t2==='1'+groupId){
-            affectedMatches.add(r.id);
-            cascadeAffected(r.id,affectedMatches);
-          }
+        if(pos1B!==pos1A){
+          R32_BRACKET.forEach(r=>{
+            if(r.t1==='1'+groupId||r.t2==='1'+groupId){
+              affectedMatches.add(r.id);
+              cascadeAffected(r.id,affectedMatches);
+            }
+          });
+        }
+        if(pos2B!==pos2A){
+          R32_BRACKET.forEach(r=>{
+            if(r.t1==='2'+groupId||r.t2==='2'+groupId){
+              affectedMatches.add(r.id);
+              cascadeAffected(r.id,affectedMatches);
+            }
+          });
+        }
+        if(pos3B!==pos3A){
+          try{
+            const thirdsBefore=getBestThirds(getAllStandings(predsBefore));
+            const thirdsAfter=getBestThirds(getAllStandings(predsAfter));
+            const assignBefore=assignThirdsToSlots(thirdsBefore);
+            const assignAfter=assignThirdsToSlots(thirdsAfter);
+            const allMids=new Set([...Object.keys(assignBefore),...Object.keys(assignAfter)]);
+            allMids.forEach(mid=>{
+              if(assignBefore[mid]!==assignAfter[mid]){
+                affectedMatches.add(mid);
+                cascadeAffected(mid,affectedMatches);
+              }
+            });
+          }catch(e3){console.warn('Third place cascade error:',e3);}
+        }
+        affectedMatches.forEach(mid=>{
+          if(userPredictions[mid]!==undefined) delete userPredictions[mid];
         });
       }
-
-      // If 2nd place changed - find R32 match with slot 2+groupId
-      if(pos2B!==pos2A){
-        R32_BRACKET.forEach(r=>{
-          if(r.t1==='2'+groupId||r.t2==='2'+groupId){
-            affectedMatches.add(r.id);
-            cascadeAffected(r.id,affectedMatches);
-          }
-        });
-      }
-
-      // If 3rd place changed - find which R32 slot had this group assigned
-      if(pos3B!==pos3A){
-        const thirdsBefore=getBestThirds(getAllStandings(predsBefore));
-        const thirdsAfter=getBestThirds(getAllStandings(predsAfter));
-        const assignBefore=assignThirdsToSlots(thirdsBefore);
-        const assignAfter=assignThirdsToSlots(thirdsAfter);
-        const allMids=new Set([...Object.keys(assignBefore),...Object.keys(assignAfter)]);
-        allMids.forEach(mid=>{
-          if(assignBefore[mid]!==assignAfter[mid]){
-            affectedMatches.add(mid);
-            cascadeAffected(mid,affectedMatches);
-          }
-        });
-      }
-
-      // Delete affected predictions that were already saved
-      affectedMatches.forEach(mid=>{
-        if(userPredictions[mid]!==undefined) delete userPredictions[mid];
-      });
     }
+  }catch(e2){
+    console.warn('Cascade detection error:',e2);
+    affectedMatches=new Set(); // reset so save still works
   }
 
   userPredictions[match.id]=pred;
