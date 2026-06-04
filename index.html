@@ -1830,6 +1830,32 @@ function renderGeneralView(match){
 window.saveGeneralView=async function(){
   const phaseMatches=allMatches.filter(m=>m.phase===currentPhaseFilter);
   let saved=0,skipped=0;
+
+  // For group phase: detect cascade changes before updating predictions
+  let generalAffected=new Set();
+  if(currentPhaseFilter==='g'){
+    try{
+      phaseMatches.forEach(m=>{
+        const h=document.getElementById('gh_'+m.id)?.value;
+        const a=document.getElementById('ga_'+m.id)?.value;
+        if(h===''||a===''||h===undefined||a===undefined) return;
+        const pred={h:parseInt(h),a:parseInt(a)};
+        if(JSON.stringify(userPredictions[m.id])===JSON.stringify(pred)) return; // no change
+        const groupId=Object.keys(GROUP_MATCHES).find(g=>GROUP_MATCHES[g].includes(m.id));
+        if(!groupId) return;
+        const predsBefore=Object.assign({},userPredictions);
+        const predsAfter=Object.assign({},userPredictions,{[m.id]:pred});
+        const standBefore=calcGroupStandings(groupId,predsBefore);
+        const standAfter=calcGroupStandings(groupId,predsAfter);
+        const pos1B=standBefore[0]?.team, pos1A=standAfter[0]?.team;
+        const pos2B=standBefore[1]?.team, pos2A=standAfter[1]?.team;
+        const pos3B=standBefore[2]?.team, pos3A=standAfter[2]?.team;
+        if(pos1B!==pos1A) R32_BRACKET.forEach(r=>{ if(r.t1==='1'+groupId||r.t2==='1'+groupId){generalAffected.add(r.id);cascadeAffected(r.id,generalAffected);} });
+        if(pos2B!==pos2A) R32_BRACKET.forEach(r=>{ if(r.t1==='2'+groupId||r.t2==='2'+groupId){generalAffected.add(r.id);cascadeAffected(r.id,generalAffected);} });
+      });
+    }catch(e){console.warn('General cascade error:',e);generalAffected=new Set();}
+  }
+
   phaseMatches.forEach(m=>{
     const h=document.getElementById('gh_'+m.id)?.value;
     const a=document.getElementById('ga_'+m.id)?.value;
@@ -1849,12 +1875,9 @@ window.saveGeneralView=async function(){
       skipped++;
     }
   });
-  // Remove affected KO predictions if teams changed
-  if(affectedMatches.size > 0){
-    affectedMatches.forEach(mid => {
-      delete userPredictions[mid];
-    });
-  }
+
+  // Remove cascade-affected KO predictions
+  generalAffected.forEach(mid=>{ if(userPredictions[mid]!==undefined) delete userPredictions[mid]; });
 
   try{
     await setDoc(doc(db,'quinielas',currentUser.uid),{
@@ -1867,14 +1890,14 @@ window.saveGeneralView=async function(){
   }catch(e){alert('Error al guardar.');return;}
 
   // Show warning if matches were cleared
-  if(affectedMatches.size > 0){
+  if(generalAffected.size > 0){
     const phases = {r32:'Ronda de 32',oct:'Octavos',qf:'Cuartos',sf:'Semifinal','3rd':'3er Lugar',final:'Final'};
-    const affectedList = [...affectedMatches].map(mid=>{
+    const affectedList = [...generalAffected].map(mid=>{
       const m = allMatches.find(x=>x.id===mid);
       return m ? phases[m.phase]||m.phase : mid;
     });
     const uniquePhases = [...new Set(affectedList)];
-    const msg = `⚠️ Tus cambios modificaron los clasificados.\n\nSe borraron ${affectedMatches.size} predicción(es) en: ${uniquePhases.join(', ')}\n\nPor favor recaptura esos partidos.`;
+    const msg = `⚠️ Tus cambios modificaron los clasificados.\n\nSe borraron ${generalAffected.size} predicción(es) en: ${uniquePhases.join(', ')}\n\nPor favor recaptura esos partidos.`;
     setTimeout(()=>alert(msg), 300);
   }
 
@@ -2238,7 +2261,7 @@ window.saveMatch=async function(){
   if(affectedMatches.size>0){
     const phaseNames={r32:'Ronda de 32',oct:'Octavos',qf:'Cuartos',sf:'Semifinal','3rd':'3er Lugar',final:'Final'};
     const phases=[...new Set([...affectedMatches].map(mid=>{const m=allMatches.find(x=>x.id===mid);return m?phaseNames[m.phase]||m.phase:mid;}))];
-    setTimeout(()=>alert(`⚠️ Tus cambios modificaron los clasificados.\n\nSe borraron ${affectedMatches.size} predicción(es) de: ${phases.join(', ')}\n\nPor favor recaptura esos partidos.`),300);
+    setTimeout(()=>alert(`⚠️ Tus cambios modificaron los clasificados.\n\nSe borraron ${generalAffected.size} predicción(es) de: ${phases.join(', ')}\n\nPor favor recaptura esos partidos.`),300);
   }
   if(allMatches.every(m=>userPredictions[m.id]!==undefined)){showCompletedState();return;}
   // Check if we just completed a phase
