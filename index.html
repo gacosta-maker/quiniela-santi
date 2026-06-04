@@ -1838,6 +1838,13 @@ window.saveGeneralView=async function(){
       skipped++;
     }
   });
+  // Remove affected KO predictions if teams changed
+  if(affectedMatches.size > 0){
+    affectedMatches.forEach(mid => {
+      delete userPredictions[mid];
+    });
+  }
+
   try{
     await setDoc(doc(db,'quinielas',currentUser.uid),{
       nombre:currentUser.displayName||currentUser.email,
@@ -1847,6 +1854,18 @@ window.saveGeneralView=async function(){
       updatedAt:new Date().toISOString()
     });
   }catch(e){alert('Error al guardar.');return;}
+
+  // Show warning if matches were cleared
+  if(affectedMatches.size > 0){
+    const phases = {r32:'Ronda de 32',oct:'Octavos',qf:'Cuartos',sf:'Semifinal','3rd':'3er Lugar',final:'Final'};
+    const affectedList = [...affectedMatches].map(mid=>{
+      const m = allMatches.find(x=>x.id===mid);
+      return m ? phases[m.phase]||m.phase : mid;
+    });
+    const uniquePhases = [...new Set(affectedList)];
+    const msg = `⚠️ Tus cambios modificaron los clasificados.\n\nSe borraron ${affectedMatches.size} predicción(es) en: ${uniquePhases.join(', ')}\n\nPor favor recaptura esos partidos.`;
+    setTimeout(()=>alert(msg), 300);
+  }
 
   const summary=document.getElementById('generalSummary');
   if(skipped===0){
@@ -2092,15 +2111,79 @@ window.setPhase=function(phase){
 
 window.jumpTo=function(id){const i=allMatches.findIndex(m=>m.id===id);if(i!==-1){currentMatchIdx=i;currentPhaseFilter=allMatches[i].phase;renderMatch();}};
 
+// Get classified teams from predictions for comparison
+function getClassifiedTeams(preds) {
+  const standings = getAllStandings(preds);
+  const bestThirds = getBestThirds(standings);
+  const thirdAssignments = assignThirdsToSlots(bestThirds);
+  const classified = {};
+  R32_BRACKET.forEach(r => {
+    const home = r.t1.startsWith('3') ? (thirdAssignments[r.id]||null) : resolveSlot(r.t1, standings);
+    const away = r.t2.startsWith('3') ? (thirdAssignments[r.id]||null) : resolveSlot(r.t2, standings);
+    classified[r.id] = {home, away};
+  });
+  return classified;
+}
+
+// Cascade affected matches through bracket chain
+function cascadeAffected(mid, affected) {
+  Object.entries(BRACKET_CHAIN).forEach(([matchId, chain]) => {
+    if((chain.h==='W'+mid||chain.a==='W'+mid||chain.h==='RU'+mid||chain.a==='RU'+mid) && !affected.has(matchId)) {
+      affected.add(matchId);
+      cascadeAffected(matchId, affected);
+    }
+  });
+}
+
+// Find which KO matches are affected by team changes
+function findAffectedKOMatches(before, after) {
+  const affected = new Set();
+  R32_BRACKET.forEach(r => {
+    const b=before[r.id], a=after[r.id];
+    if(!b||!a) return;
+    if(b.home!==a.home||b.away!==a.away) {
+      affected.add(r.id);
+      cascadeAffected(r.id, affected);
+    }
+  });
+  return affected;
+}
+
 window.saveMatch=async function(){
   if(isLocked()){alert("La quiniela está cerrada. Ya no se pueden modificar predicciones.");return;}
   const h=document.getElementById("scoreH").value,a=document.getElementById("scoreA").value;
   if(h===''||a===''){alert("Ingresa el marcador de ambos equipos");return;}
   const match=allMatches[currentMatchIdx];
-  userPredictions[match.id]={h:parseInt(h),a:parseInt(a)};
+  const isKO=match.phase!=='g';
+  const pred={h:parseInt(h),a:parseInt(a)};
+  if(isKO&&parseInt(h)===parseInt(a)){
+    const ph=document.getElementById("penH")?.value;
+    const pa=document.getElementById("penA")?.value;
+    if(ph!==''&&ph!==undefined&&pa!==''&&pa!==undefined){pred.ph=parseInt(ph);pred.pa=parseInt(pa);}
+  }
+
+  // Detect if group change affects KO predictions
+  let affectedMatches=new Set();
+  if(match.phase==='g'){
+    const beforeC=getClassifiedTeams(userPredictions);
+    const tempPreds={...userPredictions,[match.id]:pred};
+    const afterC=getClassifiedTeams(tempPreds);
+    affectedMatches=findAffectedKOMatches(beforeC,afterC);
+    // Remove affected predictions
+    affectedMatches.forEach(mid=>delete userPredictions[mid]);
+  }
+
+  userPredictions[match.id]=pred;
   try{
     await setDoc(doc(db,"quinielas",currentUser.uid),{nombre:currentUser.displayName||currentUser.email,email:currentUser.email,foto:currentUser.photoURL||'',predicciones:userPredictions,updatedAt:new Date().toISOString()});
   }catch(e){alert("Error al guardar. Verifica tu conexión.");return;}
+
+  // Warn user if predictions were cleared
+  if(affectedMatches.size>0){
+    const phaseNames={r32:'Ronda de 32',oct:'Octavos',qf:'Cuartos',sf:'Semifinal','3rd':'3er Lugar',final:'Final'};
+    const phases=[...new Set([...affectedMatches].map(mid=>{const m=allMatches.find(x=>x.id===mid);return m?phaseNames[m.phase]||m.phase:mid;}))];
+    setTimeout(()=>alert(`⚠️ Tus cambios modificaron los clasificados.\n\nSe borraron ${affectedMatches.size} predicción(es) de: ${phases.join(', ')}\n\nPor favor recaptura esos partidos.`),300);
+  }
   if(allMatches.every(m=>userPredictions[m.id]!==undefined)){showCompletedState();return;}
   // Check if we just completed a phase
   const savedMatch=allMatches[currentMatchIdx];
