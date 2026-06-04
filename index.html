@@ -1717,7 +1717,7 @@ window.goToQuiniela=async function(){
     currentMatchIdx=idx===-1?0:idx;
     currentPhaseFilter=allMatches[currentMatchIdx].phase;
     renderMatch();
-  }catch(e){document.getElementById("quinielaContainer").innerHTML='<div class="empty-state"><div class="empty-icon">😕</div>Error al cargar.</div>';}
+  }catch(e){console.error('goToQuiniela error:',e,e.stack);document.getElementById("quinielaContainer").innerHTML='<div class="empty-state"><div class="empty-icon">😕</div>Error al cargar: '+e.message+'</div>';}
 };
 
 function flag(team){
