@@ -1831,43 +1831,41 @@ window.saveGeneralView=async function(){
   const phaseMatches=allMatches.filter(m=>m.phase===currentPhaseFilter);
   let saved=0,skipped=0;
 
-  // For group phase: detect cascade changes before updating predictions
+  // 1. Detect cascade changes BEFORE updating userPredictions
   let generalAffected=new Set();
-  if(currentPhaseFilter==='g'){
-    try{
+  try{
+    if(currentPhaseFilter==='g'){
       phaseMatches.forEach(m=>{
         const h=document.getElementById('gh_'+m.id)?.value;
         const a=document.getElementById('ga_'+m.id)?.value;
         if(h===''||a===''||h===undefined||a===undefined) return;
-        const pred={h:parseInt(h),a:parseInt(a)};
-        if(JSON.stringify(userPredictions[m.id])===JSON.stringify(pred)) return; // no change
+        const newPred={h:parseInt(h),a:parseInt(a)};
+        const oldPred=userPredictions[m.id];
+        if(oldPred&&oldPred.h===newPred.h&&oldPred.a===newPred.a) return;
         const groupId=Object.keys(GROUP_MATCHES).find(g=>GROUP_MATCHES[g].includes(m.id));
         if(!groupId) return;
         const predsBefore=Object.assign({},userPredictions);
-        const predsAfter=Object.assign({},userPredictions,{[m.id]:pred});
+        const predsAfter=Object.assign({},userPredictions,{[m.id]:newPred});
         const standBefore=calcGroupStandings(groupId,predsBefore);
         const standAfter=calcGroupStandings(groupId,predsAfter);
-        const pos1B=standBefore[0]?.team, pos1A=standAfter[0]?.team;
-        const pos2B=standBefore[1]?.team, pos2A=standAfter[1]?.team;
-        const pos3B=standBefore[2]?.team, pos3A=standAfter[2]?.team;
-        if(pos1B!==pos1A) R32_BRACKET.forEach(r=>{ if(r.t1==='1'+groupId||r.t2==='1'+groupId){generalAffected.add(r.id);cascadeAffected(r.id,generalAffected);} });
-        if(pos2B!==pos2A) R32_BRACKET.forEach(r=>{ if(r.t1==='2'+groupId||r.t2==='2'+groupId){generalAffected.add(r.id);cascadeAffected(r.id,generalAffected);} });
+        if(standBefore[0]?.team!==standAfter[0]?.team)
+          R32_BRACKET.forEach(r=>{ if(r.t1==='1'+groupId||r.t2==='1'+groupId){generalAffected.add(r.id);cascadeAffected(r.id,generalAffected);} });
+        if(standBefore[1]?.team!==standAfter[1]?.team)
+          R32_BRACKET.forEach(r=>{ if(r.t1==='2'+groupId||r.t2==='2'+groupId){generalAffected.add(r.id);cascadeAffected(r.id,generalAffected);} });
       });
-    }catch(e){console.warn('General cascade error:',e);generalAffected=new Set();}
-  }
+    }
+  }catch(e){console.warn('Cascade error:',e);generalAffected=new Set();}
 
+  // 2. Update userPredictions with all filled inputs
   phaseMatches.forEach(m=>{
     const h=document.getElementById('gh_'+m.id)?.value;
     const a=document.getElementById('ga_'+m.id)?.value;
     if(h!==''&&a!==''&&h!==undefined&&a!==undefined){
       const pred={h:parseInt(h),a:parseInt(a)};
-      const isKO=m.phase!=='g';
-      if(isKO&&parseInt(h)===parseInt(a)){
+      if(m.phase!=='g'&&parseInt(h)===parseInt(a)){
         const ph=document.getElementById('gph_'+m.id)?.value;
         const pa=document.getElementById('gpa_'+m.id)?.value;
-        if(ph!==''&&ph!==undefined&&pa!==''&&pa!==undefined){
-          pred.ph=parseInt(ph);pred.pa=parseInt(pa);
-        }
+        if(ph!==''&&ph!==undefined&&pa!==''&&pa!==undefined){pred.ph=parseInt(ph);pred.pa=parseInt(pa);}
       }
       userPredictions[m.id]=pred;
       saved++;
@@ -1876,9 +1874,10 @@ window.saveGeneralView=async function(){
     }
   });
 
-  // Remove cascade-affected KO predictions
-  generalAffected.forEach(mid=>{ if(userPredictions[mid]!==undefined) delete userPredictions[mid]; });
+  // 3. Delete cascade-affected KO predictions
+  generalAffected.forEach(mid=>{if(userPredictions[mid]!==undefined) delete userPredictions[mid];});
 
+  // 4. Save to Firebase
   try{
     await setDoc(doc(db,'quinielas',currentUser.uid),{
       nombre:currentUser.displayName||currentUser.email,
@@ -1887,242 +1886,46 @@ window.saveGeneralView=async function(){
       predicciones:userPredictions,
       updatedAt:new Date().toISOString()
     });
-  }catch(e){alert('Error al guardar.');return;}
+  }catch(e){alert('Error al guardar. Verifica tu conexión.');return;}
 
-  // Show warning if matches were cleared
-  if(generalAffected.size > 0){
-    const phases = {r32:'Ronda de 32',oct:'Octavos',qf:'Cuartos',sf:'Semifinal','3rd':'3er Lugar',final:'Final'};
-    const affectedList = [...generalAffected].map(mid=>{
-      const m = allMatches.find(x=>x.id===mid);
-      return m ? phases[m.phase]||m.phase : mid;
-    });
-    const uniquePhases = [...new Set(affectedList)];
-    const msg = `⚠️ Tus cambios modificaron los clasificados.\n\nSe borraron ${generalAffected.size} predicción(es) en: ${uniquePhases.join(', ')}\n\nPor favor recaptura esos partidos.`;
-    setTimeout(()=>alert(msg), 300);
+  // 5. Re-render everything (both views stay in sync)
+  const phaseOrder=['g','r32','oct','qf','sf','3rd','final'];
+  const phaseNames={r32:'Ronda de 32',oct:'Octavos',qf:'Cuartos',sf:'Semifinal','3rd':'3er Lugar',final:'Final'};
+
+  // Show cascade warning
+  if(generalAffected.size>0){
+    const phases=[...new Set([...generalAffected].map(mid=>{const m=allMatches.find(x=>x.id===mid);return m?phaseNames[m.phase]||m.phase:mid;}))];
+    setTimeout(()=>alert(`⚠️ Tus cambios modificaron los clasificados.\n\nSe borraron ${generalAffected.size} predicción(es) de: ${phases.join(', ')}\n\nPor favor recaptura esos partidos.`),300);
   }
 
-  const summary=document.getElementById('generalSummary');
   if(skipped===0){
-    // All done — jump to next phase
-    if(summary) {summary.textContent='✅ ¡Todos los partidos guardados!';summary.className='save-summary ok';}
-    const phaseOrder=['g','r32','oct','qf','sf','3rd','final'];
-    const idx=phaseOrder.indexOf(currentPhaseFilter);
-    if(idx<phaseOrder.length-1){
-      setTimeout(()=>{
-        currentPhaseFilter=phaseOrder[idx+1];
-        renderMatch();
-      },800);
+    // All done - jump to next phase (same as Vista 1a1)
+    const curIdx=phaseOrder.indexOf(currentPhaseFilter);
+    if(curIdx<phaseOrder.length-1){
+      currentPhaseFilter=phaseOrder[curIdx+1];
+      // Find first unpredicted match in next phase
+      const nextMatch=allMatches.find(m=>m.phase===currentPhaseFilter&&userPredictions[m.id]===undefined);
+      if(nextMatch) currentMatchIdx=allMatches.indexOf(nextMatch);
     }
   } else {
-    if(summary){
-      summary.textContent=`✅ ${saved} guardados — ⬜ ${skipped} partido${skipped>1?'s':''} sin documentar`;
-      summary.className='save-summary warn';
-    }
-    // Refresh to show updated states
-    renderGeneralView();
-    renderMatch();
-  }
-};
-
-function renderMatch(){
-  const match=allMatches[currentMatchIdx];
-  const predicted=Object.keys(userPredictions).length;
-  const total=allMatches.length;
-  const pct=Math.round((predicted/total)*100);
-  const cur=userPredictions[match.id];
-  const locked=isLocked();
-  // Resolve actual team names for knockout rounds based on user's own predictions
-  const matchTeams=getMatchTeams(match, userPredictions);
-
-  // Phase colors and labels
-  const phaseConfig = {
-    g:   {bg:'linear-gradient(135deg,#1a5faf 0%,#0d3a6e 100%)', badge:'rgba(255,255,255,.15)', label:'Fase de Grupos'},
-    r32: {bg:'linear-gradient(135deg,#0f766e 0%,#065f46 100%)', badge:'rgba(255,255,255,.2)',  label:'Ronda de 32'},
-    oct: {bg:'linear-gradient(135deg,#7c3aed 0%,#4c1d95 100%)', badge:'rgba(255,255,255,.2)', label:'Octavos de Final'},
-    qf:  {bg:'linear-gradient(135deg,#b45309 0%,#78350f 100%)', badge:'rgba(255,255,255,.2)', label:'Cuartos de Final'},
-    sf:  {bg:'linear-gradient(135deg,#be185d 0%,#831843 100%)', badge:'rgba(255,255,255,.2)', label:'Semifinal'},
-    '3rd':{bg:'linear-gradient(135deg,#475569 0%,#1e293b 100%)',badge:'rgba(255,255,255,.2)', label:'3er Lugar'},
-    final:{bg:'linear-gradient(135deg,#b45309 0%,#92400e 100%)',badge:'rgba(255,255,255,.25)',label:'⭐ GRAN FINAL'},
-  };
-  const pc=phaseConfig[match.phase]||phaseConfig.g;
-  const phaseStyle=`background:${pc.bg}`;
-  const badgeStyle=`background:${pc.badge};border:1px solid rgba(255,255,255,.25)`;
-  const phaseLabel=pc.label;
-
-  // Phase filter tabs
-  const phaseTabs=PHASES.map(p=>{
-    const count=allMatches.filter(m=>m.phase===p.key&&userPredictions[m.id]!==undefined).length;
-    const total2=allMatches.filter(m=>m.phase===p.key).length;
-    const active=currentPhaseFilter===p.key?'active':'';
-    const allDone=count===total2;
-    return `<button class="phase-tab ${active}" data-phase="${p.key}" onclick="setPhase('${p.key}')">${p.label} ${count}/${total2}${allDone?'✓':''}</button>`;
-  }).join('');
-
-  // All saved matches in current phase - big flag scroll style
-  const phaseMatches=allMatches.filter(m=>m.phase===currentPhaseFilter);
-  const savedMatches=phaseMatches.filter(m=>userPredictions[m.id]!==undefined);
-  let completedHtml='';
-  let scrollHtml='';
-  if(savedMatches.length){
-    const items=savedMatches.map(m=>{
-      const sc=userPredictions[m.id],isCur=m.id===match.id;
-      const mt=getMatchTeams(m, userPredictions);
-      return `<div class="saved-card${isCur?' active-card':''}" onclick="jumpTo('${m.id}')">
-        <div class="saved-card-teams">
-          <div class="saved-card-team">
-            <div class="saved-card-flag">${flag(mt.home)}</div>
-            <div class="saved-card-name">${mt.home}</div>
-          </div>
-          <div class="saved-card-vs">
-            <div class="saved-card-score">${sc.h} - ${sc.a}</div>
-            <div class="saved-card-date">${m.date}</div>
-          </div>
-          <div class="saved-card-team">
-            <div class="saved-card-flag">${flag(mt.away)}</div>
-            <div class="saved-card-name">${mt.away}</div>
-          </div>
-        </div>
-        <div class="saved-card-check">✓</div>
-      </div>`;
-    }).join('');
-    scrollHtml=`<div class="saved-scroll-wrap">
-      <div class="saved-scroll-header">
-        <span class="saved-scroll-title">Partidos guardados</span>
-        <span class="saved-scroll-count">${savedMatches.length}/${phaseMatches.length} en esta fase</span>
-      </div>
-      <div class="saved-scroll-list" id="savedScrollList">${items}</div>
-    </div>`;
+    // Find first unpredicted match in current phase
+    const nextPending=allMatches.find(m=>m.phase===currentPhaseFilter&&userPredictions[m.id]===undefined);
+    if(nextPending) currentMatchIdx=allMatches.indexOf(nextPending);
   }
 
-  // Lock banner (needed in both views)
-  const lockBannerEarly=locked?`<div class="lock-banner"><span class="lock-banner-icon">🔒</span><div><div class="lock-banner-text">La quiniela está cerrada</div><div class="lock-banner-sub">Ya no es posible modificar predicciones. Puedes ver tus respuestas y el ranking.</div></div></div>`:'';
-
-  // Phase completion reminder (needed in both views)
-  const groupsDoneEarly=allMatches.filter(m=>m.phase==='g'&&userPredictions[m.id]!==undefined).length;
-  const r32DoneEarly=allMatches.filter(m=>m.phase==='r32'&&userPredictions[m.id]!==undefined).length;
-  const octDoneEarly=allMatches.filter(m=>m.phase==='oct'&&userPredictions[m.id]!==undefined).length;
-  const qfDoneEarly=allMatches.filter(m=>m.phase==='qf'&&userPredictions[m.id]!==undefined).length;
-  let phaseBannerEarly='';
-  if(groupsDoneEarly===72&&r32DoneEarly===0&&match.phase==='g'){
-    phaseBannerEarly=`<div style="background:linear-gradient(135deg,rgba(15,118,110,.1),rgba(6,95,70,.05));border:1px solid rgba(15,118,110,.3);border-radius:14px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:12px"><span style="font-size:22px">🎯</span><div><div style="font-weight:700;color:#0f766e;font-size:14px">¡Fase de Grupos completa!</div><div style="font-size:12px;color:var(--muted);margin-top:2px">Ahora documenta la <strong>Ronda de 32</strong></div></div><button onclick="setPhase('r32')" style="margin-left:auto;background:#0f766e;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif">Ir a Ronda 32 →</button></div>`;
-  } else if(r32DoneEarly===16&&octDoneEarly===0&&match.phase==='r32'){
-    phaseBannerEarly=`<div style="background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.25);border-radius:14px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:12px"><span style="font-size:22px">🎯</span><div><div style="font-weight:700;color:#7c3aed;font-size:14px">¡Ronda de 32 completa!</div><div style="font-size:12px;color:var(--muted);margin-top:2px">Ahora documenta los <strong>Octavos de Final</strong></div></div><button onclick="setPhase('oct')" style="margin-left:auto;background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif">Ir a Octavos →</button></div>`;
-  }
-
-  // View toggle
-  const viewToggleHtml=`<div class="view-toggle">
-    <button class="view-btn ${currentView==='one'?'active':''}" onclick="setView('one')">⚽ Vista 1 a 1</button>
-    <button class="view-btn ${currentView==='general'?'active':''}" onclick="setView('general')">📋 Vista General</button>
-  </div>`;
-
-  // If general view, render different layout
-  if(currentView==='general'){
-    const predicted=Object.keys(userPredictions).length;
-    const total=allMatches.length;
-    const pct=Math.round((predicted/total)*100);
-    document.getElementById('quinielaContainer').innerHTML=`
-      <div class="q-header-card">
-        <div class="q-greeting">Hola, <strong>${currentUser.displayName||currentUser.email}</strong> 👋</div>
-        <div class="q-title">Mi Quiniela · Mundial 2026</div>
-        <div class="progress-wrap">
-          <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
-          <div class="progress-pct">${pct}%</div>
-        </div>
-        <div class="progress-sub">${predicted} de ${total} partidos completados</div>
-      </div>
-      ${renderCountdownBanner()}
-      ${lockBannerEarly}
-      ${phaseBannerEarly}
-      <div class="phase-tabs">${phaseTabs}</div>
-      ${viewToggleHtml}
-      ${renderGeneralView(match)}`;
-    return;
-  }
-
-  const lockBanner=locked?`<div class="lock-banner"><span class="lock-banner-icon">🔒</span><div><div class="lock-banner-text">La quiniela está cerrada</div><div class="lock-banner-sub">Ya no es posible modificar predicciones. Puedes ver tus respuestas y el ranking.</div></div></div>`:'';
-
-  const scoreSection=locked?`
-    <div class="score-section">
-      <div class="score-section-label">Tu predicción</div>
-      <div class="score-inputs">
-        <div class="score-input-wrap">
-          <div class="score-team-label">${flag(matchTeams.home)} ${matchTeams.home}</div>
-          <input class="score-input has-value" type="number" disabled value="${cur!==undefined?cur.h:'—'}" style="opacity:.7;cursor:not-allowed">
-        </div>
-        <div class="score-separator"><div class="score-dash">:</div></div>
-        <div class="score-input-wrap">
-          <div class="score-team-label">${flag(matchTeams.away)} ${matchTeams.away}</div>
-          <input class="score-input has-value" type="number" disabled value="${cur!==undefined?cur.a:'—'}" style="opacity:.7;cursor:not-allowed">
-        </div>
-      </div>
-    </div>`:
-    `<div class="score-section">
-      <div class="score-section-label">¿Cuál será el marcador final?</div>
-      <div class="score-inputs">
-        <div class="score-input-wrap">
-          <div class="score-team-label">${flag(matchTeams.home)} ${matchTeams.home}</div>
-          <input class="score-input${cur?' has-value':''}" id="scoreH" type="number" min="0" max="20" placeholder="–" value="${cur!==undefined?cur.h:''}">
-        </div>
-        <div class="score-separator"><div class="score-dash">:</div><div style="font-size:18px;opacity:.3">⚽</div></div>
-        <div class="score-input-wrap">
-          <div class="score-team-label">${flag(match.away)} ${match.away}</div>
-          <input class="score-input${cur?' has-value':''}" id="scoreA" type="number" min="0" max="20" placeholder="–" value="${cur!==undefined?cur.a:''}">
-        </div>
-      </div>
-    </div>`;
-
-  const actionsSection=locked?`<div class="edit-note" style="color:var(--red)">🔒 Quiniela cerrada — solo lectura</div>`:
-    `<div class="match-actions">
-      <button class="btn btn-secondary" onclick="prevMatch()" ${currentMatchIdx===0?'disabled':''}>← Anterior</button>
-      <button class="btn btn-primary" onclick="saveMatch()">${cur!==undefined?'💾 Actualizar':'Guardar y Siguiente →'}</button>
-    </div>
-    ${cur!==undefined?'<div class="edit-note">✏️ Ya guardaste este partido — toca para modificarlo</div>':''}`;
-
-  document.getElementById("quinielaContainer").innerHTML=`
-    <div class="q-header-card">
-      <div class="q-greeting">Hola, <strong>${currentUser.displayName||currentUser.email}</strong> 👋</div>
-      <div class="q-title">Mi Quiniela · Mundial 2026</div>
-      <div class="progress-wrap">
-        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
-        <div class="progress-pct">${pct}%</div>
-      </div>
-      <div class="progress-sub">${predicted} de ${total} partidos completados</div>
-    </div>
-    ${renderCountdownBanner()}
-    ${lockBannerEarly}
-    ${phaseBannerEarly}
-    <div class="phase-tabs">${phaseTabs}</div>
-    ${viewToggleHtml}
-    ${scrollHtml}
-    <div class="match-card">
-      <div class="match-card-top" style="${phaseStyle}">
-        <div class="match-top-inner">
-          <span class="match-round-badge" style="${badgeStyle}">${phaseLabel} — ${match.round}</span>
-          <div class="match-num" style="color:rgba(255,255,255,.8)">Partido #${match.num} · ${match.date} ${match.time}</div>
-        </div>
-      </div>
-      <div class="match-card-body">
-        <div class="teams-row">
-          <div class="team-side"><div class="team-flag">${flag(matchTeams.home)}</div><div class="team-name">${matchTeams.home}</div></div>
-          <div class="vs-wrap"><div class="vs-text">VS</div><div class="vs-dot"></div></div>
-          <div class="team-side"><div class="team-flag">${flag(matchTeams.away)}</div><div class="team-name">${matchTeams.away}</div></div>
-        </div>
-        <div class="info-grid">
-          <div class="info-item"><div class="info-item-icon">📍</div><div class="info-item-label">Sede</div><div class="info-item-val">${match.venue}</div></div>
-          <div class="info-item"><div class="info-item-icon">📅</div><div class="info-item-label">Fecha</div><div class="info-item-val">${match.date}</div></div>
-          <div class="info-item"><div class="info-item-icon">🕐</div><div class="info-item-label">Hora</div><div class="info-item-val">${match.time} hrs</div></div>
-          <div class="info-item"><div class="info-item-icon">🔵</div><div class="info-item-label">Grupo/Fase</div><div class="info-item-val">${match.round}</div></div>
-        </div>
-        ${scoreSection}
-        ${actionsSection}
-      </div>
-    </div>`;
-
-}
-
-window.setView=function(v){
-  currentView=v;
+  // Re-render current view
   renderMatch();
+
+  // Show summary in general view if still in same phase
+  if(currentView==='general'&&skipped>0){
+    setTimeout(()=>{
+      const summary=document.getElementById('generalSummary');
+      if(summary){
+        summary.textContent=`✅ ${saved} guardados — ⬜ ${skipped} partido${skipped>1?'s':''} sin documentar`;
+        summary.className='save-summary warn';
+      }
+    },100);
+  }
 };
 
 window.checkGenPenalty=function(matchId){
