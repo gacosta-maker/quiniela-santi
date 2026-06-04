@@ -2165,12 +2165,32 @@ window.saveMatch=async function(){
   // Detect if group change affects KO predictions
   let affectedMatches=new Set();
   if(match.phase==='g'){
-    const beforeC=getClassifiedTeams(userPredictions);
-    const tempPreds={...userPredictions,[match.id]:pred};
+    // Snapshot classified teams BEFORE the change
+    const beforeC=getClassifiedTeams({...userPredictions});
+    // Classified teams AFTER the change
+    const tempPreds=Object.assign({},userPredictions,{[match.id]:pred});
     const afterC=getClassifiedTeams(tempPreds);
-    affectedMatches=findAffectedKOMatches(beforeC,afterC);
-    // Remove affected predictions
-    affectedMatches.forEach(mid=>delete userPredictions[mid]);
+
+    // Compare each R32 match
+    R32_BRACKET.forEach(r=>{
+      const b=beforeC[r.id], a=afterC[r.id];
+      const changed=(b&&a&&(b.home!==a.home||b.away!==a.away));
+      console.log(`R32 ${r.id}: before=[${b?.home},${b?.away}] after=[${a?.home},${a?.away}] changed=${changed}`);
+      if(changed){
+        affectedMatches.add(r.id);
+        cascadeAffected(r.id,affectedMatches);
+      }
+    });
+
+    console.log(`Affected matches: ${[...affectedMatches].join(', ')}`);
+
+    // Remove affected predictions from ALL KO phases
+    affectedMatches.forEach(mid=>{
+      if(userPredictions[mid]!==undefined){
+        console.log(`Deleting prediction for ${mid}`);
+        delete userPredictions[mid];
+      }
+    });
   }
 
   userPredictions[match.id]=pred;
