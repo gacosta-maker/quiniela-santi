@@ -1946,6 +1946,11 @@ window.setPhase=function(phase){
   renderMatch();
 };
 
+window.setView=function(v){
+  currentView=v;
+  renderMatch();
+};
+
 window.jumpTo=function(id){const i=allMatches.findIndex(m=>m.id===id);if(i!==-1){currentMatchIdx=i;currentPhaseFilter=allMatches[i].phase;renderMatch();}};
 
 function renderMatch(){
@@ -2004,7 +2009,7 @@ function renderMatch(){
   }
 
   const lockBannerEarly=locked?`<div class="lock-banner"><span class="lock-banner-icon">🔒</span><div><div class="lock-banner-text">La quiniela está cerrada</div><div class="lock-banner-sub">Ya no es posible modificar predicciones.</div></div></div>`:'';
-  const noPagoBanner=!userIsPaid?`<div class="no-pago-banner"><span class="npb-icon">💳</span><div class="npb-text">¡Recuerda realizar tu pago!<div class="npb-sub">Si no pagas antes del <strong>10 de junio</strong>, tu ranking aparecerá en 0.</div></div></div>`:'';
+
 
   const viewToggleHtml=`<div class="view-toggle">
     <button class="view-btn ${currentView==='one'?'active':''}" onclick="setView('one')">⚽ Vista 1 a 1</button>
@@ -2020,7 +2025,7 @@ function renderMatch(){
         <div class="progress-sub">${predicted} de ${total} partidos completados</div>
       </div>
       ${renderCountdownBanner()}
-      ${lockBannerEarly}${noPagoBanner}
+      ${lockBannerEarly}
       <div class="phase-tabs">${phaseTabs}</div>
       ${viewToggleHtml}
       ${renderGeneralView(match)}`;
@@ -2054,7 +2059,7 @@ function renderMatch(){
       <div class="progress-sub">${predicted} de ${total} partidos completados</div>
     </div>
     ${renderCountdownBanner()}
-    ${lockBannerEarly}${noPagoBanner}
+    ${lockBannerEarly}
     <div class="phase-tabs">${phaseTabs}</div>
     ${viewToggleHtml}
     ${scrollHtml}
