@@ -80,14 +80,14 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
 .login-note{background:linear-gradient(135deg,rgba(26,95,175,.06),rgba(74,179,224,.04));border:1px solid rgba(26,95,175,.15);border-radius:10px;padding:12px 16px;font-size:12px;color:var(--muted);line-height:1.7;display:flex;align-items:flex-start;gap:8px}
 .login-note-icon{color:var(--blue);font-size:16px;flex-shrink:0;margin-top:1px}
 .login-error{color:var(--red);font-size:13px;margin-top:12px;padding:10px 14px;background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.2);border-radius:8px;display:none}
-.home-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px;position:relative;overflow:hidden}
+.home-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 20px;position:relative;overflow:hidden}
 .home-stadium{position:absolute;bottom:0;left:0;right:0;height:260px;background:linear-gradient(to top,rgba(22,163,74,.04) 0%,transparent 100%);pointer-events:none}
 .home-eyebrow{display:inline-flex;align-items:center;gap:8px;background:var(--white);border:1px solid var(--border);border-radius:50px;padding:6px 18px;font-size:12px;font-weight:700;color:var(--blue);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:20px;box-shadow:var(--shadow)}
 .home-eyebrow::before{content:'⚽';font-size:14px}
 .home-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(52px,9vw,96px);letter-spacing:3px;line-height:.95;margin-bottom:6px;text-align:center}
 .home-title .t-blue{color:var(--blue)}.home-title .t-orange{color:var(--orange)}.home-title .t-gray{color:var(--light)}
 .home-sub{color:var(--muted);font-size:15px;margin-bottom:48px;font-weight:400;text-align:center}
-.home-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1000px;width:100%;margin-bottom:40px}
+.home-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1000px;width:100%;margin-bottom:20px}
 .home-card{background:var(--white);border:1px solid var(--border);border-radius:20px;padding:32px 24px;cursor:pointer;transition:.3s;text-align:center;position:relative;overflow:hidden;box-shadow:var(--shadow)}
 .home-card-accent{position:absolute;top:0;left:0;right:0;height:4px}
 .home-card:nth-child(1) .home-card-accent{background:linear-gradient(90deg,var(--blue),var(--blue3))}
@@ -205,7 +205,7 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
 .info-bar-item strong{color:var(--text)}
 .rank-table{background:var(--white);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
 .rank-table-header{display:grid;grid-template-columns:36px minmax(100px,1fr) 48px 54px 60px repeat(5,52px);gap:4px;padding:11px 14px;background:var(--off);border-bottom:2px solid var(--border);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
-.rank-row{display:grid;grid-template-columns:52px 1fr 68px 80px;gap:8px;padding:14px 20px;border-top:1px solid var(--border);align-items:center;transition:.2s}
+.rank-row{display:grid;grid-template-columns:36px minmax(100px,1fr) 48px 54px 60px repeat(5,52px);gap:4px;padding:11px 14px;border-top:1px solid var(--border);align-items:center;transition:.2s;cursor:pointer}
 .rank-row:hover{background:var(--off)}
 .rank-row.me{background:rgba(26,95,175,.04);border-left:3px solid var(--blue)}
 .rank-pos{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--light);display:flex;align-items:center}
@@ -370,8 +370,8 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
 .save-summary.warn{color:var(--orange);background:rgba(245,166,35,.06);border-color:rgba(245,166,35,.2)}
 
 /* RANKING OPPORTUNITIES */
-.rank-table-header{display:grid;grid-template-columns:36px minmax(120px,1fr) 48px 58px repeat(5,56px);gap:4px;padding:10px 14px;background:var(--off);border-bottom:1px solid var(--border);font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--muted);align-items:center}
-.rank-row{display:grid;grid-template-columns:36px minmax(120px,1fr) 48px 58px repeat(5,56px);gap:4px;padding:11px 14px;border-top:1px solid var(--border);align-items:center;transition:.2s;cursor:pointer}
+.rank-table-header{display:grid;grid-template-columns:36px minmax(100px,1fr) 48px 54px 60px repeat(5,52px);gap:4px;padding:11px 14px;background:var(--off);border-bottom:2px solid var(--border);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.rank-row{display:grid;grid-template-columns:36px minmax(100px,1fr) 48px 54px 60px repeat(5,52px);gap:4px;padding:11px 14px;border-top:1px solid var(--border);align-items:center;transition:.2s;cursor:pointer}
 .rank-row:hover{background:var(--off)}
 .rank-row.me{background:rgba(26,95,175,.04);border-left:3px solid var(--blue)}
 .opp-cell{display:flex;flex-direction:column;align-items:center;gap:3px}
@@ -575,7 +575,7 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
       <div class="home-card" id="adminCard" style="display:none" onclick="showAdminPage()"><div class="home-card-accent"></div><div class="hc-icon-wrap">🎯</div><div class="hc-title">Admin</div><div class="hc-desc">Captura los resultados reales y actualiza el ranking</div></div>
     </div>
     <!-- MUNDIAL COUNTDOWN -->
-    <div id="mundialCountdownWrap" style="margin:24px 0 8px;width:100%;max-width:580px"></div>
+    <div id="mundialCountdownWrap" style="margin:12px 0 12px;width:100%;max-width:580px"></div>
     <div class="home-stats">
       <div class="stat-card"><div class="stat-num" id="statParticipants">—</div><div class="stat-label">Participantes</div></div>
       <div class="stat-card"><div class="stat-num">104</div><div class="stat-label">Partidos totales</div></div>
@@ -2482,7 +2482,7 @@ window.loadRanking=async function(){
               </div>
             </div>`:'—'}
           </td>
-        </tr>`;        </tr>`;
+        </tr>`;
       }).join('');
 
       rankHtml+=`<div class="rank-row${p.email===myEmail?' me':''}" onclick="toggleDetail('detail_${i}')">
