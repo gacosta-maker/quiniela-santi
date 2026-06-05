@@ -87,7 +87,7 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
 .home-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(52px,9vw,96px);letter-spacing:3px;line-height:.95;margin-bottom:6px;text-align:center}
 .home-title .t-blue{color:var(--blue)}.home-title .t-orange{color:var(--orange)}.home-title .t-gray{color:var(--light)}
 .home-sub{color:var(--muted);font-size:15px;margin-bottom:48px;font-weight:400;text-align:center}
-.home-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1000px;width:100%;margin-bottom:20px}
+.home-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1000px;width:100%;margin-bottom:8px}
 .home-card{background:var(--white);border:1px solid var(--border);border-radius:20px;padding:32px 24px;cursor:pointer;transition:.3s;text-align:center;position:relative;overflow:hidden;box-shadow:var(--shadow)}
 .home-card-accent{position:absolute;top:0;left:0;right:0;height:4px}
 .home-card:nth-child(1) .home-card-accent{background:linear-gradient(90deg,var(--blue),var(--blue3))}
@@ -183,9 +183,9 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
 .completed-state{text-align:center;padding:60px 20px;background:var(--white);border-radius:20px;border:1px solid var(--border);box-shadow:var(--shadow-lg)}
 .rank-container{max-width:740px;width:100%;margin:0 auto;padding:24px 20px 48px}
 .rank-hero{background:linear-gradient(135deg,var(--blue) 0%,#0d3a6e 100%);border-radius:20px;padding:28px 32px;margin-bottom:24px;position:relative;overflow:hidden;box-shadow:var(--shadow-lg)}
-.rank-hero::before{content:'🏆';position:absolute;left:24px;top:50%;transform:translateY(-50%);font-size:80px;opacity:.12}
-.rank-hero-title{font-family:'Bebas Neue',sans-serif;font-size:38px;letter-spacing:3px;color:#fff;margin-bottom:4px;padding-left:96px}
-.rank-hero-sub{color:rgba(255,255,255,.6);font-size:14px;padding-left:96px}
+.rank-hero::before{content:'🏆';position:absolute;right:130px;top:50%;transform:translateY(-50%);font-size:72px;opacity:.13}
+.rank-hero-title{font-family:'Bebas Neue',sans-serif;font-size:38px;letter-spacing:3px;color:#fff;margin-bottom:4px}
+.rank-hero-sub{color:rgba(255,255,255,.6);font-size:14px}
 .refresh-btn{position:absolute;top:20px;right:20px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;font-family:'Outfit',sans-serif;transition:.2s}
 .refresh-btn:hover{background:rgba(255,255,255,.2)}
 .podium{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:24px;align-items:end}
@@ -204,8 +204,8 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
 .info-bar-item{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
 .info-bar-item strong{color:var(--text)}
 .rank-table{background:var(--white);border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
-.rank-table-header{display:grid;grid-template-columns:36px minmax(100px,1fr) 48px 54px 60px repeat(5,52px);gap:4px;padding:11px 14px;background:var(--off);border-bottom:2px solid var(--border);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
-.rank-row{display:grid;grid-template-columns:36px minmax(100px,1fr) 48px 54px 60px repeat(5,52px);gap:4px;padding:11px 14px;border-top:1px solid var(--border);align-items:center;transition:.2s;cursor:pointer}
+.rank-table-header{display:grid;grid-template-columns:36px minmax(90px,1fr) 46px 52px repeat(6,48px);gap:4px;padding:11px 14px;background:var(--off);border-bottom:2px solid var(--border);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.rank-row{display:grid;grid-template-columns:36px minmax(90px,1fr) 46px 52px repeat(6,48px);gap:4px;padding:11px 14px;border-top:1px solid var(--border);align-items:center;transition:.2s;cursor:pointer}
 .rank-row:hover{background:var(--off)}
 .rank-row.me{background:rgba(26,95,175,.04);border-left:3px solid var(--blue)}
 .rank-pos{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--light);display:flex;align-items:center}
@@ -370,8 +370,8 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
 .save-summary.warn{color:var(--orange);background:rgba(245,166,35,.06);border-color:rgba(245,166,35,.2)}
 
 /* RANKING OPPORTUNITIES */
-.rank-table-header{display:grid;grid-template-columns:36px minmax(100px,1fr) 48px 54px 60px repeat(5,52px);gap:4px;padding:11px 14px;background:var(--off);border-bottom:2px solid var(--border);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
-.rank-row{display:grid;grid-template-columns:36px minmax(100px,1fr) 48px 54px 60px repeat(5,52px);gap:4px;padding:11px 14px;border-top:1px solid var(--border);align-items:center;transition:.2s;cursor:pointer}
+.rank-table-header{display:grid;grid-template-columns:36px minmax(90px,1fr) 46px 52px repeat(6,48px);gap:4px;padding:11px 14px;background:var(--off);border-bottom:2px solid var(--border);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.rank-row{display:grid;grid-template-columns:36px minmax(90px,1fr) 46px 52px repeat(6,48px);gap:4px;padding:11px 14px;border-top:1px solid var(--border);align-items:center;transition:.2s;cursor:pointer}
 .rank-row:hover{background:var(--off)}
 .rank-row.me{background:rgba(26,95,175,.04);border-left:3px solid var(--blue)}
 .opp-cell{display:flex;flex-direction:column;align-items:center;gap:3px}
@@ -733,6 +733,56 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
       </div>
       <p style="font-size:14px;color:var(--text);line-height:1.7">La participación en la quiniela implica la <strong>aceptación total</strong> de las presentes reglas y de cualquier resolución que los organizadores emitan para atender situaciones no previstas.</p>
     </div>
+
+    <!-- OPORTUNIDADES EXPLAINER -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:18px;padding:28px 32px;margin-top:20px;box-shadow:var(--shadow);position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;width:4px;height:100%;background:linear-gradient(180deg,#0ea5e9,#8b5cf6)"></div>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+        <div style="width:40px;height:40px;border-radius:12px;background:rgba(14,165,233,.1);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">📊</div>
+        <div>
+          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:#0ea5e9;margin-bottom:2px">Glosario del Ranking</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;color:var(--text)">¿Qué son las Oportunidades?</div>
+        </div>
+      </div>
+      <p style="font-size:14px;color:var(--text);line-height:1.8;margin-bottom:20px">Las <strong>Oportunidades</strong> son los partidos de fases eliminatorias en los que <em>tú mismo pronosticaste un ganador</em>, y ese equipo efectivamente avanzó. Si predijiste que Argentina pasaría a Cuartos y Argentina realmente pasó, ese partido <strong>cuenta como una oportunidad tuya</strong> en esa fase — y si además acertaste el resultado, sumas punto.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+        <div style="background:rgba(22,163,74,.05);border:1.5px solid rgba(22,163,74,.2);border-radius:14px;padding:16px">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--green);margin-bottom:10px">✅ Tienes oportunidad</div>
+          <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--text)">
+            <div>🇲🇽 Predijiste: <strong>México gana</strong> en R32</div>
+            <div>✓ México <strong>ganó</strong> en el torneo real</div>
+            <div style="background:rgba(22,163,74,.1);border-radius:8px;padding:8px;margin-top:4px;font-weight:700;color:var(--green);text-align:center">= 1 Oportunidad en Octavos ✓</div>
+          </div>
+        </div>
+        <div style="background:rgba(220,38,38,.04);border:1.5px solid rgba(220,38,38,.15);border-radius:14px;padding:16px">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--red);margin-bottom:10px">❌ Sin oportunidad</div>
+          <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--text)">
+            <div>🇲🇽 Predijiste: <strong>México gana</strong> en R32</div>
+            <div>✗ México <strong>quedó eliminado</strong></div>
+            <div style="background:rgba(220,38,38,.08);border-radius:8px;padding:8px;margin-top:4px;font-weight:700;color:var(--red);text-align:center">= 0 Oportunidades en esa fase</div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px">Columnas del Ranking:</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 14px;background:rgba(232,185,49,.07);border:1px solid rgba(232,185,49,.25);border-radius:10px">
+          <span style="background:rgba(232,185,49,.15);color:#92400e;border:1px solid rgba(232,185,49,.3);border-radius:6px;padding:3px 7px;font-size:11px;font-weight:800;white-space:nowrap;flex-shrink:0">⭐ EXA.</span>
+          <span style="font-size:13px;color:var(--text)"><strong>Exactos</strong> — Predijiste el marcador preciso (ej. 2-1 y fue 2-1). Sirve de desempate si empatan en puntos.</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 14px;background:rgba(22,163,74,.05);border:1px solid rgba(22,163,74,.2);border-radius:10px">
+          <span style="background:rgba(22,163,74,.12);color:#166534;border:1px solid rgba(22,163,74,.3);border-radius:6px;padding:3px 7px;font-size:11px;font-weight:800;white-space:nowrap;flex-shrink:0">OPP<br>GRUPOS</span>
+          <span style="font-size:13px;color:var(--text)"><strong>Grupos (72 partidos)</strong> — De los 72 partidos de grupos, cuántos resultados acertaste (ganó X, empató, ganó Y).</span>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 14px;background:rgba(14,165,233,.05);border:1px solid rgba(14,165,233,.2);border-radius:10px">
+          <span style="background:rgba(14,165,233,.12);color:#0369a1;border:1px solid rgba(14,165,233,.3);border-radius:6px;padding:3px 7px;font-size:11px;font-weight:800;white-space:nowrap;flex-shrink:0">OPP<br>R32–FINAL</span>
+          <span style="font-size:13px;color:var(--text)"><strong>Ronda de 32 → Final</strong> — En cada fase eliminatoria, de los equipos que <em>tú predijiste</em> que pasarían y realmente avanzaron, cuántos resultados acertaste.</span>
+        </div>
+      </div>
+      <div style="margin-top:16px;padding:12px 16px;background:var(--off);border-radius:10px;font-size:13px;color:var(--muted);line-height:1.6">
+        💡 <strong>En resumen:</strong> Las oportunidades no se ganan — se <em>merecen</em>. Quien predijo correctamente que un equipo llegaría a Semifinales tiene más oportunidades de sumar puntos que quien no lo predijo.
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -2458,9 +2508,8 @@ window.loadRanking=async function(){
         const dot=`<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${PHASE_COLORS[ph]};margin-right:6px;flex-shrink:0"></span>`;
         if(!o||!o.available){
           return `<tr style="border-top:1px solid var(--border)">
-            <td style="padding:10px 12px;display:flex;align-items:center">${dot}${phaseFullLabels[ph]}</td>
-            <td style="padding:10px 12px;text-align:center;color:var(--muted)">${userDone}/${phTotal}</td>
-            <td style="padding:10px 12px;text-align:center;color:var(--muted)">—</td>
+            <td style="padding:10px 12px"><div style="display:flex;align-items:center">${dot}${phaseFullLabels[ph]}</div></td>
+            <td style="padding:10px 12px;text-align:center;color:${PHASE_COLORS[ph]};font-weight:700">${userDone}/${phTotal}</td>
             <td style="padding:10px 12px;text-align:center;color:var(--muted)">—</td>
             <td style="padding:10px 12px;text-align:center;color:var(--muted)">—</td>
             <td style="padding:10px 12px;text-align:center;color:var(--muted)">—</td>
