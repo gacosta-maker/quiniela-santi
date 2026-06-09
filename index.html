@@ -489,6 +489,7 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
       <button class="nav-tab" onclick="showPage('ranking');loadRanking()">Ranking</button>
       <button class="nav-tab" onclick="showPage('grupos');loadGrupos()">Grupos</button>
       <button class="nav-tab" onclick="showPage('reglas')">Reglas</button>
+      <button class="nav-tab" onclick="showPage('pagar')">Cómo Pagar</button>
       <button class="nav-tab" id="adminTab" style="display:none" onclick="showAdminPage()">Admin</button>
     </div>
     <div class="user-pill">
@@ -785,6 +786,103 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
 
   </div>
 </div>
+
+<div class="page" id="page-pagar">
+  <div style="max-width:680px;width:100%;margin:0 auto;padding:24px 20px 60px">
+
+    <!-- HERO con badge de estado -->
+    <div style="background:linear-gradient(135deg,#1a5faf 0%,#0d3a6e 100%);border-radius:20px;padding:28px 32px;margin-bottom:20px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;gap:20px;box-shadow:0 8px 28px rgba(26,95,175,.25)">
+      <div style="flex:1">
+        <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:6px">Quiniela Santi 2026</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:34px;letter-spacing:3px;color:#fff;line-height:1;margin-bottom:6px">CÓMO PAGAR</div>
+        <div style="font-size:13px;color:rgba(255,255,255,.6)">Realiza tu depósito y envía tu comprobante para activar tu cuenta</div>
+      </div>
+      <!-- Badge dinámico de estado -->
+      <div id="pagoBadge" style="flex-shrink:0;border-radius:14px;padding:14px 18px;text-align:center;min-width:120px;transition:.4s"></div>
+    </div>
+
+    <!-- Aviso (solo si no ha pagado) -->
+    <div id="pagoWarning" style="display:none;background:#fef2f2;border:1.5px solid #fecaca;border-radius:14px;padding:14px 18px;margin-bottom:20px;align-items:flex-start;gap:12px">
+      <div style="font-size:20px;flex-shrink:0">⚠️</div>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#991b1b;margin-bottom:3px">Sin pago no apareces en el ranking</div>
+        <div style="font-size:13px;color:#7f1d1d;line-height:1.6">Aunque completes todos tus pronósticos, tu puntaje aparecerá en <strong>0</strong> hasta que el administrador confirme tu pago. Fecha límite: <strong>10 de junio a las 23:59 hrs</strong>.</div>
+      </div>
+    </div>
+
+    <!-- PASO 1 -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:16px;padding:20px 24px;margin-bottom:12px;display:flex;gap:16px;box-shadow:var(--shadow)">
+      <div style="width:36px;height:36px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0">1</div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">Realiza el depósito o transferencia</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6">Envía el monto de inscripción a la siguiente cuenta:</div>
+        <div style="background:var(--off);border:1px solid var(--border);border-radius:12px;padding:16px 18px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+            <div>
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:3px">Banco</div>
+              <div style="font-size:14px;font-weight:600;color:var(--text)">BBVA Bancomer</div>
+            </div>
+            <div>
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:3px">Titular</div>
+              <div style="font-size:14px;font-weight:600;color:var(--text)">[ Nombre del titular ]</div>
+            </div>
+            <div>
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:3px">Número de cuenta</div>
+              <div style="font-size:16px;font-weight:700;color:var(--blue);letter-spacing:2px">[ No. de cuenta ]</div>
+            </div>
+            <div>
+              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:3px">CLABE interbancaria</div>
+              <div style="font-size:14px;font-weight:700;color:var(--blue);letter-spacing:1px">[ CLABE ]</div>
+            </div>
+          </div>
+          <div style="border-top:1px solid var(--border);padding-top:12px">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:4px">Monto de inscripción</div>
+            <div style="font-size:26px;font-weight:700;color:var(--blue)">$[ XXX ] <span style="font-size:14px;font-weight:400;color:var(--muted)">MXN</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PASO 2 -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:16px;padding:20px 24px;margin-bottom:12px;display:flex;gap:16px;box-shadow:var(--shadow)">
+      <div style="width:36px;height:36px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0">2</div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">Guarda tu comprobante</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.6">Toma una captura de pantalla o guarda el PDF de tu transferencia. Lo necesitarás en el paso siguiente para enviárselo al administrador.</div>
+      </div>
+    </div>
+
+    <!-- PASO 3 -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:16px;padding:20px 24px;margin-bottom:20px;display:flex;gap:16px;box-shadow:var(--shadow)">
+      <div style="width:36px;height:36px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0">3</div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px">Envía el comprobante al administrador</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6">Manda tu comprobante al siguiente correo. Incluye tu nombre completo en el asunto:</div>
+        <div style="background:var(--off);border:1px solid var(--border);border-radius:12px;padding:14px 18px;display:flex;align-items:center;gap:14px;margin-bottom:10px">
+          <span style="font-size:22px;flex-shrink:0">📧</span>
+          <div>
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:3px">Correo del administrador</div>
+            <div style="font-size:15px;font-weight:700;color:var(--blue)">amelo@santisoluciones.com</div>
+          </div>
+        </div>
+        <div style="padding:10px 14px;background:var(--off);border-radius:10px;font-size:13px;color:var(--muted)">
+          <span style="font-weight:600;color:var(--text)">Asunto sugerido:</span> Pago Quiniela 2026 – [Tu nombre completo]
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirmación -->
+    <div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:14px;padding:14px 18px;display:flex;gap:12px;align-items:flex-start">
+      <div style="font-size:20px;flex-shrink:0">✅</div>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#166534;margin-bottom:3px">¿Cuándo se activa mi cuenta?</div>
+        <div style="font-size:13px;color:#15803d;line-height:1.6">El administrador validará tu comprobante y activará tu participación en <strong>menos de 24 horas</strong>. Cuando se confirme, el indicador en la parte superior de esta página cambiará a <strong>Cuenta activa ✅</strong>.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 
 <div class="page" id="page-grupos">
   <div style="max-width:1100px;width:100%;margin:0 auto;padding:24px 20px 48px">
@@ -1754,9 +1852,27 @@ onAuthStateChanged(auth,async(user)=>{
   }
 });
 
+window.renderPagoPage=function(){
+  const badge=document.getElementById('pagoBadge');
+  const warning=document.getElementById('pagoWarning');
+  if(!badge) return;
+  if(userIsPaid){
+    badge.style.background='rgba(22,163,74,.2)';
+    badge.style.border='1.5px solid rgba(22,163,74,.5)';
+    badge.innerHTML='<div style="font-size:26px;margin-bottom:4px">✅</div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#86efac">Cuenta activa</div><div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:3px">Pago confirmado</div>';
+    if(warning) warning.style.display='none';
+  } else {
+    badge.style.background='rgba(220,38,38,.2)';
+    badge.style.border='1.5px solid rgba(220,38,38,.4)';
+    badge.innerHTML='<div style="font-size:26px;margin-bottom:4px">⏳</div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:#fca5a5">Pago pendiente</div><div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:3px">No activado</div>';
+    if(warning){ warning.style.display='flex'; }
+  }
+};
+
 window.showPage=function(p){
   document.querySelectorAll(".page").forEach(el=>el.classList.remove("active"));
-  document.querySelectorAll(".nav-tab").forEach((t,i)=>t.classList.toggle("active",["home","quiniela","ranking","grupos","reglas","admin"][i]===p));
+  document.querySelectorAll(".nav-tab").forEach((t,i)=>t.classList.toggle("active",["home","quiniela","ranking","grupos","reglas","pagar","admin"][i]===p));
+  if(p==='pagar') setTimeout(renderPagoPage,50);
   document.getElementById("page-"+p).classList.add("active");
 };
 
@@ -1809,13 +1925,13 @@ function flag(team){
 }
 
 // Lock date: June 10, 2026
-const LOCK_DATE = new Date('2026-06-10T00:00:00');
+const LOCK_DATE = new Date('2026-06-10T23:59:00');
 function isLocked(){return new Date() >= LOCK_DATE;}
 
 // Countdown to lock
 function getCountdown(){
   const now=new Date();
-  const lock=new Date('2026-06-10T00:00:00');
+  const lock=new Date('2026-06-10T23:59:00');
   const diff=lock-now;
   if(diff<=0) return null;
   const days=Math.floor(diff/(1000*60*60*24));
