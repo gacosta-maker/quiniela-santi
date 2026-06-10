@@ -3097,17 +3097,6 @@ window.loadGrupos=async function(){
       const totalMatches=matchIds.length;
       const color=groupColors[groupId]||'#1a5faf';
 
-      html+=`<div class="grupo-card">
-        <div class="grupo-card-header" style="background:${color}">
-          <div class="grupo-card-title">Grupo ${groupId}</div>
-          <div class="grupo-card-played">${played}/${totalMatches} partidos</div>
-        </div>
-        <div class="grupo-table-wrap"><table class="grupo-table">
-          <thead><tr>
-            <th>#</th><th style="text-align:left">Equipo</th><th>Pts</th><th>PJ</th><th>GF</th><th>GC</th><th>DG</th><th style="width:12px"></th>
-          </tr></thead>
-          <tbody>`;
-
       let rows='';
       st.forEach((t,i)=>{
         const isQ=i<2;
