@@ -2821,7 +2821,7 @@ async function renderAdminPanel(){
         <div class="pago-toggle">
           <span class="toggle-label ${p.paid?'paid':'unpaid'}">${p.paid?'PAGADO':'NO PAGADO'}</span>
           <label class="toggle-switch">
-            <input type="checkbox" ${p.paid?'checked':''} onchange="togglePago('${p.uid}', this.checked)">
+            <input type="checkbox" ${p.paid?'checked':''} onchange="togglePago('${p.uid}', this.checked, this)">
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -3013,14 +3013,16 @@ window.loadGrupos=async function(){
   }
 };
 
-window.togglePago=async function(uid, paid){
+window.togglePago=async function(uid, paid, el){
+  // el = the checkbox element passed explicitly to avoid losing event in async
   try{
-    const pagosDoc=await getDoc(doc(db,"config","pagos"));
+    const pagosRef=doc(db,"config","pagos");
+    const pagosDoc=await getDoc(pagosRef);
     const pagos=pagosDoc.exists()?pagosDoc.data():{};
     pagos[uid]=paid;
-    await setDoc(doc(db,"config","pagos"),pagos);
+    await setDoc(pagosRef, pagos, {merge:true});
     // Update label visually
-    const row=event.target.closest('.pago-row');
+    const row=el?el.closest('.pago-row'):null;
     if(row){
       const label=row.querySelector('.toggle-label');
       if(label){
@@ -3028,7 +3030,10 @@ window.togglePago=async function(uid, paid){
         label.className='toggle-label '+(paid?'paid':'unpaid');
       }
     }
-  }catch(e){alert('Error al guardar pago.');}
+  }catch(e){
+    console.error('togglePago error:',e);
+    alert('Error al guardar pago: '+e.message);
+  }
 };
 
 window.adminCheckPenalty=function(matchId){
