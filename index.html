@@ -1819,7 +1819,7 @@ function getMatchTeams(match, predictions) {
   return {home, away};
 }
 
-let currentUser=null,currentMatchIdx=0,userPredictions={},adminUnlocked=false,currentPhaseFilter='g',currentView='one';
+let currentUser=null,currentMatchIdx=0,userPredictions={},adminUnlocked=false,currentPhaseFilter='g',currentView='one',adminSection='pagos';
 
 window.loginWithGoogle=async function(){
   const provider=new GoogleAuthProvider();
