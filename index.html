@@ -398,9 +398,9 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
   .gm-flag{width:32px;height:32px}
   .gm-name{font-size:9px;max-width:56px}
 }
-.grupos-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.grupos-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:8px;margin-bottom:0}
 .grupo-card{background:#fff;border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
-.grupo-card .grupo-table-wrap{overflow-x:auto}
+.grupo-card .grupo-table-wrap{overflow-x:hidden}
 .grupo-card-header{padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
 .grupo-card-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:#fff}
 .grupo-card-played{font-size:11px;color:rgba(255,255,255,.7);font-weight:600}
@@ -2768,6 +2768,86 @@ setTimeout(()=>{
 },500);
 
 
+window.showPlayerBracket=function(uid){
+  const participants=window._bracketParticipants||[];
+  const real=window._bracketReal||{};
+  const player=participants.find(p=>p.uid===uid);
+  if(!player) return;
+
+  // Highlight selected button
+  document.querySelectorAll('#bracketPlayerBtns button').forEach(btn=>{
+    const isActive=btn.getAttribute('onclick')===`showPlayerBracket('${uid}')`;
+    btn.style.background=isActive?'var(--blue)':'var(--white)';
+    btn.style.color=isActive?'#fff':'var(--text)';
+  });
+
+  const preds=player.preds;
+  const bm=(a,b)=>`<div style="background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.12);border-radius:5px;overflow:hidden;width:62px"><div style="padding:4px 6px;font-size:9px;font-weight:500;color:rgba(255,255,255,.75);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a}</div><div style="height:0.5px;background:rgba(255,255,255,.12)"></div><div style="padding:4px 6px;font-size:9px;color:rgba(255,255,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${b}</div></div>`;
+  const bcol=(label,matches)=>`<div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0"><div style="font-size:8px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.35);text-align:center;margin-bottom:3px">${label}</div>${matches}</div>`;
+
+  // Get bracket chain from predictions
+  const getWinner=(matchId)=>{
+    const p=preds[matchId];
+    if(!p) return '—';
+    const m=allMatches.find(x=>x.id===matchId);
+    if(!m) return '—';
+    if(p.h>p.a) return m.home;
+    if(p.a>p.h) return m.away;
+    if(p.ph!==undefined) return p.ph>p.pa?m.home:m.away;
+    return m.home;
+  };
+
+  // Get standings from player predictions
+  const playerStandings=getAllStandings(preds);
+
+  // Build group summary  
+  const groupColors={A:'#1a5faf',B:'#16a34a',C:'#7c3aed',D:'#d97706',E:'#dc2626',F:'#0891b2',G:'#db2777',H:'#ea580c',I:'#0e7490',J:'#4f46e5',K:'#7c3aed',L:'#be123c'};
+  let groupsHtml='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-bottom:12px">';
+  Object.entries(GROUPS||{}).forEach(([gId,teams])=>{
+    const st=playerStandings[gId]||[];
+    const color=groupColors[gId]||'#1a5faf';
+    groupsHtml+=`<div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <div style="padding:6px 10px;background:${color};display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#fff">Grupo ${gId}</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <tr style="border-bottom:0.5px solid var(--border)"><th style="padding:3px 6px;text-align:left;font-size:9px;color:var(--muted)">Equipo</th><th style="padding:3px 4px;font-size:9px;color:var(--muted)">Pts</th><th style="width:10px"></th></tr>
+        ${st.slice(0,4).map((t,i)=>`<tr style="border-top:0.5px solid var(--border);background:${i<2?'rgba(22,163,74,.04)':''}"><td style="padding:4px 6px;display:flex;align-items:center;gap:4px"><span style="font-size:9px;font-weight:500;color:var(--muted);width:12px">${i+1}</span><span style="font-size:12px">${flag(t.team)||''}</span><span style="font-size:10px;color:var(--text)">${t.team}</span></td><td style="padding:4px 4px;text-align:center;font-weight:700;font-size:11px;color:var(--blue)">${t.pts}</td><td>${i<2?'<span style=\'width:6px;height:6px;border-radius:50%;background:#16a34a;display:inline-block\'></span>':''}</td></tr>`).join('')}
+      </table>
+    </div>`;
+  });
+  groupsHtml+='</div>';
+
+  // Build bracket with position labels
+  const bracketHtml=`<div style="background:linear-gradient(160deg,#050e1a 0%,#0d1f35 40%,#071424 100%);border-radius:14px;padding:14px 10px;overflow-x:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;min-width:520px">
+      ${bcol('R32',bm('1A','2B')+bm('1C','2D')+bm('1E','2F')+bm('3ABCDF','2C')+bm('1B','3ADEG')+bm('2E','1F')+bm('1D','2A')+bm('3BCFG','1J'))}
+      ${bcol('Oct','<div style=\"height:12px\"></div>'+bm('·','·')+bm('·','·')+bm('·','·')+bm('·','·'))}
+      ${bcol('Cuar','<div style=\"height:30px\"></div>'+bm('·','·')+bm('·','·'))}
+      ${bcol('Semi','<div style=\"height:60px\"></div>'+bm('·','·'))}
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:5px;padding:0 6px">
+        <div style="font-size:44px;line-height:1;filter:drop-shadow(0 0 12px rgba(212,175,55,.5))">🏆</div>
+        <div style="font-size:9px;font-weight:500;letter-spacing:2.5px;color:#d4af37;text-transform:uppercase">Mundial 2026</div>
+        <div style="background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.25);border-radius:7px;padding:5px 8px;text-align:center">
+          <div style="font-size:7px;letter-spacing:1.5px;text-transform:uppercase;color:#d4af37;margin-bottom:2px">Campeón según ${player.name.split(' ')[0]}</div>
+          <div style="font-size:11px;font-weight:700;color:#fff">—</div>
+        </div>
+      </div>
+      ${bcol('Semi','<div style=\"height:60px\"></div>'+bm('·','·'))}
+      ${bcol('Cuar','<div style=\"height:30px\"></div>'+bm('·','·')+bm('·','·'))}
+      ${bcol('Oct','<div style=\"height:12px\"></div>'+bm('·','·')+bm('·','·')+bm('·','·')+bm('·','·'))}
+      ${bcol('R32',bm('1G','2H')+bm('1I','2J')+bm('3GHIJ','1H')+bm('1K','2L')+bm('3HIKL','1L')+bm('2K','2I')+bm('1J','2G')+bm('3JKLL','1H'))}
+    </div>
+  </div>`;
+
+  document.getElementById('bracketPlayerContent').innerHTML=`
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px">Grupos según ${player.name}</div>
+    ${groupsHtml}
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin:12px 0 8px">Bracket eliminatorio</div>
+    ${bracketHtml}
+  `;
+};
+
 window.showAdminPage=function(){if(adminUnlocked){showPage("admin");renderAdminPanel();}else{document.getElementById("adminModal").classList.remove("hidden");}};
 window.switchAdminTab=function(tab){adminSection=tab;renderAdminPanel();};
 window.checkAdminPass=function(){
@@ -2785,7 +2865,50 @@ async function renderAdminPanel(){
   <div class="admin-tabs">
     <button class="admin-tab ${adminSection==='resultados'?'active':''}" onclick="switchAdminTab('resultados')">🎯 Resultados Reales</button>
     <button class="admin-tab ${adminSection==='pagos'?'active':''}" onclick="switchAdminTab('pagos')">💰 Control de Pagos</button>
+    <button class="admin-tab ${adminSection==='brackets'?'active':''}" onclick="switchAdminTab('brackets')">🏆 Brackets</button>
   </div>`;
+
+  if(adminSection==='brackets'){
+    // Load all participants and their predictions
+    const [qs,rd]=await Promise.all([
+      getDocs(collection(db,"quinielas")),
+      getDoc(doc(db,"config","resultados_reales"))
+    ]);
+    const real=rd.exists()?rd.data():{};
+    let participants=[];
+    qs.forEach(d=>{
+      const data=d.data();
+      participants.push({uid:d.id,name:data.nombre||data.email,preds:data.predicciones||{},foto:data.foto||''});
+    });
+    participants.sort((a,b)=>a.name.localeCompare(b.name));
+
+    if(participants.length===0){
+      document.getElementById("adminContent").innerHTML=adminTabsHtml+'<div class="empty-state"><div class="empty-icon">👥</div>No hay participantes registrados</div>';
+      return;
+    }
+
+    // Render selector + bracket
+    const firstUid=participants[0].uid;
+    let bracketHtml=`<div style="padding:16px">
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:8px">Selecciona un participante</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap" id="bracketPlayerBtns">
+          ${participants.map((p,i)=>`<button style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:${i===0?'var(--blue)':'var(--white)'};color:${i===0?'#fff':'var(--text)'};font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif;font-weight:600;transition:.15s" onclick="showPlayerBracket('${p.uid}')">${p.name.split(' ')[0]}</button>`).join('')}
+        </div>
+      </div>
+      <div id="bracketPlayerContent"></div>
+    </div>`;
+
+    document.getElementById("adminContent").innerHTML=adminTabsHtml+bracketHtml;
+
+    // Store participants globally for bracket rendering
+    window._bracketParticipants=participants;
+    window._bracketReal=real;
+
+    // Show first player
+    showPlayerBracket(firstUid);
+    return;
+  }
 
   if(adminSection==='pagos'){
     // Load participants and payment status
@@ -2931,10 +3054,16 @@ window.loadGrupos=async function(){
 
     // Phase colors per group
     const groupColors={
-      A:'#1a5faf',B:'#0f766e',C:'#7c3aed',D:'#b45309',
-      E:'#be185d',F:'#065f46',G:'#6d28d9',H:'#0369a1',
-      I:'#92400e',J:'#166534',K:'#9f1239',L:'#1d4ed8',
+      A:'#1a5faf',B:'#16a34a',C:'#7c3aed',D:'#d97706',
+      E:'#dc2626',F:'#0891b2',G:'#db2777',H:'#ea580c',
+      I:'#0e7490',J:'#4f46e5',K:'#7c3aed',L:'#be123c',
     };
+
+    // Helper para mini partido del bracket
+    const bracketMatch=(a,b)=>`<div style="background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.12);border-radius:5px;overflow:hidden;width:60px"><div style="padding:4px 5px;font-size:9px;font-weight:500;color:rgba(255,255,255,.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a}</div><div style="height:0.5px;background:rgba(255,255,255,.12)"></div><div style="padding:4px 5px;font-size:9px;color:rgba(255,255,255,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${b}</div></div>`;
+    // Campeón actual (si hay resultados finales)
+    const finalMatch=allMatches.find(m=>m.phase==='final');
+    const champion=finalMatch&&real[finalMatch.id]?( real[finalMatch.id].h>real[finalMatch.id].a?finalMatch.home:finalMatch.away ):'';
 
     let html='<div class="grupos-grid">';
     Object.entries(GROUPS).forEach(([groupId, teams])=>{
@@ -2951,7 +3080,7 @@ window.loadGrupos=async function(){
         </div>
         <div class="grupo-table-wrap"><table class="grupo-table">
           <thead><tr>
-            <th>#</th><th>Equipo</th><th>PJ</th><th>PTS</th><th>GF</th><th>GC</th><th>DG</th>
+            <th>#</th><th style="text-align:left">Equipo</th><th>Pts</th><th>PJ</th><th>GF</th><th>GC</th><th>DG</th><th style="width:12px"></th>
           </tr></thead>
           <tbody>`;
 
@@ -2963,14 +3092,16 @@ window.loadGrupos=async function(){
         const gdClass=t.gd>0?'gd-pos':t.gd<0?'gd-neg':'';
         const badge=isQ?'<span class="classifies-badge badge-q">✓ Clasifica</span>':isT?'<span class="classifies-badge badge-t">⭐ Mejor 3ro</span>':'';
         const fImg=flag(t.team);
+        const clDot=(isQ||isT)?'<span style="width:7px;height:7px;border-radius:50%;background:'+(isT?'#f59e0b':'#16a34a')+';display:inline-block"></span>':'';
         html+=`<tr class="${rowClass}">
           <td><span class="pos-badge ${posBadgeClass}">${i+1}</span></td>
-          <td><div class="team-cell"><div class="team-flag-sm">${fImg}</div>${t.team}${badge}</div></td>
-          <td>${t.played}</td>
+          <td style="text-align:left"><div class="team-cell"><div class="team-flag-sm">${fImg}</div>${t.team}</div></td>
           <td class="pts-cell">${t.pts}</td>
+          <td>${t.played}</td>
           <td>${t.gf}</td>
           <td>${t.ga}</td>
           <td class="${gdClass}">${t.gd>0?'+'+t.gd:t.gd}</td>
+          <td>${clDot}</td>
         </tr>`;
       });
 
@@ -2980,6 +3111,69 @@ window.loadGrupos=async function(){
     });
 
     html+='</div>';
+
+    // ── BRACKET CON COPA ──
+    html+=`<div style="background:linear-gradient(160deg,#050e1a 0%,#0d1f35 40%,#071424 100%);border-radius:16px;padding:16px 12px;margin:16px 0;overflow-x:auto">
+      <div style="text-align:center;margin-bottom:10px">
+        <span style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,.35)">Progresión al campeonato</span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:5px;min-width:560px">
+        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+          <div style="font-size:8px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.35);text-align:center;margin-bottom:3px">R32</div>
+          ${bracketMatch('1A','2B')+''+bracketMatch('1C','2D')+''+bracketMatch('1E','2F')+''+bracketMatch('3ABCDF','2C')+''+bracketMatch('1B','3ADEG')+''+bracketMatch('2E','1F')+''+bracketMatch('1D','2A')+''+bracketMatch('3BCFG','1J')}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+          <div style="font-size:8px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.35);text-align:center;margin-bottom:3px">Oct</div>
+          <div style="height:12px"></div>
+          ${bracketMatch('·','·')+''+bracketMatch('·','·')+''+bracketMatch('·','·')+''+bracketMatch('·','·')}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+          <div style="font-size:8px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.35);text-align:center;margin-bottom:3px">Cuar</div>
+          <div style="height:30px"></div>
+          ${bracketMatch('·','·')+''+bracketMatch('·','·')}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+          <div style="font-size:8px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.35);text-align:center;margin-bottom:3px">Semi</div>
+          <div style="height:60px"></div>
+          ${bracketMatch('·','·')}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:6px;padding:0 8px;min-width:90px">
+          <div style="font-size:48px;line-height:1;filter:drop-shadow(0 0 14px rgba(212,175,55,.55))">🏆</div>
+          <div style="font-size:10px;font-weight:500;letter-spacing:2.5px;color:#d4af37;text-transform:uppercase">Mundial 2026</div>
+          <div style="background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.25);border-radius:8px;padding:5px 10px;text-align:center;min-width:72px">
+            <div style="font-size:7px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;color:#d4af37;margin-bottom:2px">Campeón</div>
+            <div style="font-size:11px;font-weight:500;color:#fff">${champion||'—'}</div>
+          </div>
+          <div style="background:rgba(255,255,255,.05);border:0.5px solid rgba(255,255,255,.12);border-radius:6px;padding:4px 8px;text-align:center">
+            <div style="font-size:7px;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:2px">3er lugar</div>
+            <div style="font-size:9px;color:rgba(255,255,255,.5)">Semi vs Semi</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+          <div style="font-size:8px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.35);text-align:center;margin-bottom:3px">Semi</div>
+          <div style="height:60px"></div>
+          ${bracketMatch('·','·')}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+          <div style="font-size:8px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.35);text-align:center;margin-bottom:3px">Cuar</div>
+          <div style="height:30px"></div>
+          ${bracketMatch('·','·')+''+bracketMatch('·','·')}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+          <div style="font-size:8px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.35);text-align:center;margin-bottom:3px">Oct</div>
+          <div style="height:12px"></div>
+          ${bracketMatch('·','·')+''+bracketMatch('·','·')+''+bracketMatch('·','·')+''+bracketMatch('·','·')}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+          <div style="font-size:8px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.35);text-align:center;margin-bottom:3px">R32</div>
+          ${bracketMatch('1G','2H')+''+bracketMatch('1I','2J')+''+bracketMatch('3GHIJ','1H')+''+bracketMatch('1K','2L')+''+bracketMatch('3HIKL','1L')+''+bracketMatch('2K','2I')+''+bracketMatch('1J','2G')+''+bracketMatch('3JKLL','1H')}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-top:10px;padding-top:8px;border-top:0.5px solid rgba(255,255,255,.08)">
+        <div style="display:flex;align-items:center;gap:4px"><div style="width:18px;height:7px;background:rgba(255,255,255,.14);border-radius:2px"></div><span style="font-size:9px;color:rgba(255,255,255,.35)">Clasificado</span></div>
+        <div style="display:flex;align-items:center;gap:4px"><div style="width:18px;height:7px;background:rgba(212,175,55,.15);border-radius:2px;border:0.5px solid rgba(212,175,55,.3)"></div><span style="font-size:9px;color:rgba(255,255,255,.35)">Campeón</span></div>
+      </div>
+    </div>`;
 
     // Best thirds section
     if(bestThirds.some(t=>t.pts>0)){
@@ -3014,7 +3208,6 @@ window.loadGrupos=async function(){
 };
 
 window.togglePago=async function(uid, paid, el){
-  // el = the checkbox element passed explicitly to avoid losing event in async
   try{
     const pagosRef=doc(db,"config","pagos");
     const pagosDoc=await getDoc(pagosRef);
@@ -3029,6 +3222,18 @@ window.togglePago=async function(uid, paid, el){
         label.textContent=paid?'PAGADO':'NO PAGADO';
         label.className='toggle-label '+(paid?'paid':'unpaid');
       }
+    }
+    // Si el uid modificado es el usuario actual, actualizar userIsPaid en tiempo real
+    if(currentUser && uid===currentUser.uid){
+      userIsPaid=paid;
+      // Actualizar badge en página Cómo Pagar si está visible
+      renderPagoPage();
+      // Actualizar banners de pago en Mi Quiniela si está visible
+      const pagosBanners=document.querySelectorAll('.no-pago-banner');
+      pagosBanners.forEach(b=>b.style.display=paid?'none':'flex');
+      // Re-renderizar quiniela si está abierta para quitar banner
+      const quinielaActive=document.getElementById('page-quiniela')?.classList.contains('active');
+      if(quinielaActive && paid) renderMatch();
     }
   }catch(e){
     console.error('togglePago error:',e);
