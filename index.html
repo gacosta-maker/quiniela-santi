@@ -1957,13 +1957,13 @@ function flag(team){
 }
 
 // Lock date: June 10, 2026
-const LOCK_DATE = new Date('2026-06-10T23:59:00');
+const LOCK_DATE = new Date('2026-06-11T13:00:00');
 function isLocked(){return new Date() >= LOCK_DATE;}
 
 // Countdown to lock
 function getCountdown(){
   const now=new Date();
-  const lock=new Date('2026-06-10T23:59:00');
+  const lock=new Date('2026-06-11T13:00:00');
   const diff=lock-now;
   if(diff<=0) return null;
   const days=Math.floor(diff/(1000*60*60*24));
