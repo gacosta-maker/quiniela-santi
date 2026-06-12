@@ -2810,6 +2810,109 @@ setTimeout(()=>{
 },500);
 
 
+window.showPlayerQuiniela=function(uid){
+  const participants=window._qParticipants||[];
+  const player=participants.find(p=>p.uid===uid);
+  if(!player) return;
+
+  // Highlight selected button
+  document.querySelectorAll('#qPlayerBtns button').forEach(btn=>{
+    const isActive=btn.getAttribute('onclick')===`showPlayerQuiniela('${uid}')`;
+    btn.style.background=isActive?'var(--blue)':'var(--white)';
+    btn.style.color=isActive?'#fff':'var(--text)';
+  });
+
+  const preds=player.preds;
+  const phases=['g','r32','oct','qf','sf','3rd','final'];
+  const phaseNames={g:'Fase de Grupos',r32:'Ronda de 32',oct:'Octavos',qf:'Cuartos',sf:'Semifinal','3rd':'3er Lugar',final:'Final'};
+  const phaseColors={g:'var(--blue)',r32:'#0ea5e9',oct:'#8b5cf6',qf:'#f59e0b',sf:'#ec4899','3rd':'#f97316',final:'#eab308'};
+  const totalByPhase={g:72,r32:16,oct:8,qf:4,sf:2,'3rd':1,final:1};
+
+  // Count predictions per phase
+  const countByPhase={};
+  phases.forEach(ph=>{
+    countByPhase[ph]=allMatches.filter(m=>m.phase===ph&&preds[m.id]!==undefined).length;
+  });
+  const total=Object.values(countByPhase).reduce((a,b)=>a+b,0);
+  const pct=Math.round((total/104)*100);
+
+  // Phase tabs summary
+  let tabsHtml=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">`;
+  phases.forEach(ph=>{
+    const done=countByPhase[ph];
+    const tot=totalByPhase[ph];
+    const complete=done===tot;
+    const color=phaseColors[ph];
+    tabsHtml+=`<div style="padding:5px 10px;border-radius:8px;border:1.5px solid ${complete?color:'var(--border)'};background:${complete?'rgba(255,255,255,.05)':'transparent'}">
+      <span style="font-size:10px;font-weight:700;color:${complete?color:'var(--muted)'};">${phaseNames[ph]}</span>
+      <span style="font-size:10px;color:${complete?color:'var(--muted)'}"> ${done}/${tot}${complete?' ✓':''}</span>
+    </div>`;
+  });
+  tabsHtml+=`</div>`;
+
+  // Build match list per phase
+  let matchesHtml='';
+  phases.forEach(ph=>{
+    const phMatches=allMatches.filter(m=>m.phase===ph);
+    if(!phMatches.length) return;
+    const done=countByPhase[ph];
+    const tot=phMatches.length;
+    const color=phaseColors[ph];
+
+    matchesHtml+=`<div style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid ${color}">
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:${color}">${phaseNames[ph]}</span>
+        <span style="font-size:12px;font-weight:700;color:${done===tot?'var(--green)':'var(--orange)'};">${done}/${tot} capturados</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">`;
+
+    phMatches.forEach(m=>{
+      const pred=preds[m.id];
+      const teams=getMatchTeams(m,preds);
+      const home=teams.home||m.home;
+      const away=teams.away||m.away;
+      const fH=flag(home);
+      const fA=flag(away);
+      const hasPred=pred!==undefined;
+      const bg=hasPred?'var(--white)':'rgba(220,38,38,.04)';
+      const border=hasPred?'var(--border)':'rgba(220,38,38,.2)';
+      const scoreH=hasPred?pred.h:'–';
+      const scoreA=hasPred?pred.a:'–';
+
+      matchesHtml+=`<div style="background:${bg};border:1px solid ${border};border-radius:10px;padding:10px 14px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+          <span style="font-size:13px;font-weight:600;color:var(--text)">${home}</span>
+          <div>${fH}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="width:32px;height:32px;border-radius:8px;background:${hasPred?'var(--blue)':'rgba(220,38,38,.1)'};display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:${hasPred?'#fff':'rgba(220,38,38,.5)'};">${scoreH}</div>
+          <span style="font-size:11px;color:var(--muted)">:</span>
+          <div style="width:32px;height:32px;border-radius:8px;background:${hasPred?'var(--blue)':'rgba(220,38,38,.1)'};display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:${hasPred?'#fff':'rgba(220,38,38,.5)'};">${scoreA}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div>${fA}</div>
+          <span style="font-size:13px;font-weight:600;color:var(--text)">${away}</span>
+        </div>
+      </div>`;
+    });
+    matchesHtml+=`</div></div>`;
+  });
+
+  // Progress bar
+  const progressHtml=`<div style="background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:16px;box-shadow:var(--shadow)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span style="font-size:14px;font-weight:700;color:var(--text)">Progreso total de ${player.name}</span>
+      <span style="font-size:22px;font-weight:800;color:var(--blue)">${pct}%</span>
+    </div>
+    <div style="background:var(--border);border-radius:8px;height:10px;overflow:hidden">
+      <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--blue),#0ea5e9);border-radius:8px;transition:width .4s"></div>
+    </div>
+    <div style="margin-top:6px;font-size:12px;color:var(--muted)">${total} de 104 partidos completados</div>
+  </div>`;
+
+  document.getElementById('qPlayerContent').innerHTML=progressHtml+tabsHtml+matchesHtml;
+};
+
 window.showPlayerBracket=function(uid){
   const participants=window._bracketParticipants||[];
   const real=window._bracketReal||{};
@@ -2890,7 +2993,42 @@ async function renderAdminPanel(){
     <button class="admin-tab ${adminSection==='resultados'?'active':''}" onclick="switchAdminTab('resultados')">🎯 Resultados Reales</button>
     <button class="admin-tab ${adminSection==='pagos'?'active':''}" onclick="switchAdminTab('pagos')">💰 Control de Pagos</button>
     <button class="admin-tab ${adminSection==='brackets'?'active':''}" onclick="switchAdminTab('brackets')">🏆 Brackets</button>
+    <button class="admin-tab ${adminSection==='quinielas'?'active':''}" onclick="switchAdminTab('quinielas')">📋 Quinielas</button>
   </div>`;
+
+  if(adminSection==='quinielas'){
+    const qs2=await getDocs(collection(db,"quinielas"));
+    let participants2=[];
+    qs2.forEach(d=>{
+      const data=d.data();
+      participants2.push({uid:d.id,name:data.nombre||data.email,preds:data.predicciones||{},foto:data.foto||''});
+    });
+    participants2.sort((a,b)=>a.name.localeCompare(b.name));
+
+    if(participants2.length===0){
+      document.getElementById("adminContent").innerHTML=adminTabsHtml+'<div class="empty-state"><div class="empty-icon">👥</div>No hay participantes</div>';
+      return;
+    }
+
+    const phaseNames2={g:'Fase de Grupos',r32:'Ronda de 32',oct:'Octavos',qf:'Cuartos',sf:'Semifinal','3rd':'3er Lugar',final:'Final'};
+    const phaseColors2={g:'var(--blue)',r32:'#0ea5e9',oct:'#8b5cf6',qf:'#f59e0b',sf:'#ec4899','3rd':'#f97316',final:'#eab308'};
+    const phases2=['g','r32','oct','qf','sf','3rd','final'];
+
+    let qHtml=`<div style="padding:16px">
+      <div style="margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:8px">Selecciona un participante</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap" id="qPlayerBtns">
+          ${participants2.map((p,i)=>`<button style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:${i===0?'var(--blue)':'var(--white)'};color:${i===0?'#fff':'var(--text)'};font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif;font-weight:600;transition:.15s" onclick="showPlayerQuiniela('${p.uid}')">${p.name.split(' ')[0]}</button>`).join('')}
+        </div>
+      </div>
+      <div id="qPlayerContent"></div>
+    </div>`;
+
+    document.getElementById("adminContent").innerHTML=adminTabsHtml+qHtml;
+    window._qParticipants=participants2;
+    showPlayerQuiniela(participants2[0].uid);
+    return;
+  }
 
   if(adminSection==='brackets'){
     // Load all participants and their predictions
