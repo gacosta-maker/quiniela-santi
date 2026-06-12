@@ -1957,7 +1957,7 @@ function flag(team){
 }
 
 // Lock date: June 10, 2026
-const LOCK_DATE_ELIM = new Date('2026-06-11T23:59:00'); // R32 en adelante
+const LOCK_DATE_ELIM = new Date('2026-06-12T23:59:00'); // R32 en adelante
 function isLocked(phase){
   // Fase de grupos: siempre bloqueada (ya pasó el 10 de junio)
   if(!phase || phase==='g') return true;
@@ -3143,40 +3143,56 @@ window.loadGrupos=async function(){
     const gridRow=(entries)=>`<div class="grupos-grid" style="margin-bottom:12px">${entries.map(renderGroupCard).join('')}</div>`;
 
     // Copa central con bracket
-    const copaHtml=`<div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:16px;padding:18px 12px;margin:4px 0 12px;overflow-x:auto">
-      <div style="text-align:center;margin-bottom:10px">
-        <span style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,.3)">Progresión al campeonato</span>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:4px;min-width:520px">
-        ${['R32','Oct','Cuar','Semi'].map((lbl,ci)=>{
-          const mCount=[8,4,2,1][ci];
-          const spacer=['','<div style=\"height:12px\"></div>','<div style=\"height:30px\"></div>','<div style=\"height:60px\"></div>'][ci];
-          let ms='';
-          for(let i=0;i<mCount;i++) ms+=bracketMatch('·','·');
-          return `<div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0"><div style="font-size:8px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.3);text-align:center;margin-bottom:3px">${lbl}</div>${spacer}${ms}</div>`;
-        }).join('')}
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:5px;padding:0 8px">
-          <div style="font-size:52px;line-height:1;filter:drop-shadow(0 0 16px rgba(212,175,55,.6))">🏆</div>
-          <div style="font-size:10px;font-weight:500;letter-spacing:2.5px;color:#d4af37;text-transform:uppercase">Mundial 2026</div>
-          <div style="background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.25);border-radius:8px;padding:6px 10px;text-align:center;min-width:80px">
-            <div style="font-size:7px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;color:#d4af37;margin-bottom:2px">Campeón</div>
-            <div style="font-size:12px;font-weight:500;color:#fff">${champion||'—'}</div>
-          </div>
-          <div style="background:rgba(255,255,255,.05);border:0.5px solid rgba(255,255,255,.12);border-radius:6px;padding:4px 8px;text-align:center">
-            <div style="font-size:7px;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:2px">3er lugar</div>
-            <div style="font-size:9px;color:rgba(255,255,255,.45)">Semi vs Semi</div>
+
+    // BRACKET DINÁMICO CON BANDERAS
+    const resolveRealSlot=(slot,rs)=>{
+      if(!slot||slot==='·'||slot===null) return null;
+      if(slot.length===2&&'12'.includes(slot[0])&&/[A-L]/.test(slot[1])){
+        const pos=parseInt(slot[0])-1, grp=slot[1], st=rs[grp];
+        if(st&&st[pos]&&st[pos].played>0) return {team:st[pos].team,isLeader:pos===0};
+      }
+      return null;
+    };
+    const rs2={};
+    Object.keys(GROUPS).forEach(g=>{rs2[g]=calcGroupStandings(g,real);});
+    const champReal2=(()=>{const fm=allMatches.find(m=>m.phase==='final');return fm&&real[fm.id]?(real[fm.id].h>real[fm.id].a?fm.home:fm.away):'';})();
+    const mkTeam2=(r,slot)=>{
+      if(r){const fl=flag(r.team);const bg=r.isLeader?'background:rgba(22,163,74,.18);':'';return `<div style="padding:4px 6px;display:flex;align-items:center;gap:5px;${bg}overflow:hidden"><div style="flex-shrink:0">${fl}</div><span style="font-size:9px;font-weight:500;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.team}</span></div>`;}
+      return `<div style="padding:4px 6px"><span style="font-size:8px;color:rgba(255,255,255,.2)">${slot||'·'}</span></div>`;
+    };
+    const dynMatch2=(sH,sA)=>{
+      const rH=resolveRealSlot(sH,rs2),rA=resolveRealSlot(sA,rs2);
+      const filled=rH||rA;
+      return `<div style="background:${filled?'rgba(255,255,255,.1)':'rgba(255,255,255,.05)'};border:0.5px solid ${filled?'rgba(255,255,255,.2)':'rgba(255,255,255,.08)'};border-radius:5px;overflow:hidden;width:110px">${mkTeam2(rH,sH)}<div style="height:0.5px;background:rgba(255,255,255,.1)"></div>${mkTeam2(rA,sA)}</div>`;
+    };
+    const dynCol2=(lbl,sp,ms)=>`<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0"><div style="font-size:8px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.3);text-align:center;margin-bottom:3px">${lbl}</div>${sp?`<div style="height:${sp}px"></div>`:''}${ms}</div>`;
+    const e=dynMatch2(null,null);
+    const copaHtml=`<div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:16px;padding:18px 10px;margin:4px 0 12px;overflow-x:auto">
+      <div style="text-align:center;margin-bottom:12px"><span style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,.3)">Progresión al campeonato</span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:5px;min-width:620px">
+        ${dynCol2('R32',0,dynMatch2('2A','2B')+dynMatch2('1E','3r')+dynMatch2('1F','2C')+dynMatch2('1C','2F')+dynMatch2('1I','3r')+dynMatch2('2E','2I')+dynMatch2('1A','3r')+dynMatch2('1L','3r'))}
+        ${dynCol2('Oct',12,e+e+e+e)}
+        ${dynCol2('Cuar',28,e+e)}
+        ${dynCol2('Semi',55,e)}
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:5px;padding:0 6px;min-width:80px">
+          <div style="font-size:46px;line-height:1;filter:drop-shadow(0 0 12px rgba(212,175,55,.5))">🏆</div>
+          <div style="font-size:9px;letter-spacing:2px;color:#d4af37;text-transform:uppercase">Mundial 2026</div>
+          <div style="background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.25);border-radius:7px;padding:5px 8px;text-align:center;min-width:76px">
+            <div style="font-size:7px;letter-spacing:1.5px;text-transform:uppercase;color:#d4af37;margin-bottom:2px">Campeón</div>
+            <div style="font-size:11px;font-weight:500;color:#fff">${champReal2||champion||'—'}</div>
           </div>
         </div>
-        ${['Semi','Cuar','Oct','R32'].map((lbl,ci)=>{
-          const mCount=[1,2,4,8][ci];
-          const spacer=['<div style=\"height:60px\"></div>','<div style=\"height:30px\"></div>','<div style=\"height:12px\"></div>',''][ci];
-          let ms='';
-          for(let i=0;i<mCount;i++) ms+=bracketMatch('·','·');
-          return `<div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0"><div style="font-size:8px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.3);text-align:center;margin-bottom:3px">${lbl}</div>${spacer}${ms}</div>`;
-        }).join('')}
+        ${dynCol2('Semi',55,e)}
+        ${dynCol2('Cuar',28,e+e)}
+        ${dynCol2('Oct',12,e+e+e+e)}
+        ${dynCol2('R32',0,dynMatch2('1D','3r')+dynMatch2('1G','3r')+dynMatch2('2K','2L')+dynMatch2('1H','2J')+dynMatch2('1B','3r')+dynMatch2('1J','2H')+dynMatch2('1K','3r')+dynMatch2('2D','2G'))}
+      </div>
+      <div style="display:flex;gap:12px;margin-top:10px;padding-top:8px;border-top:0.5px solid rgba(255,255,255,.08);justify-content:center">
+        <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:rgba(22,163,74,.4)"></div><span style="font-size:9px;color:rgba(255,255,255,.35)">Líder del grupo</span></div>
+        <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:rgba(255,255,255,.18)"></div><span style="font-size:9px;color:rgba(255,255,255,.35)">Clasificado</span></div>
+        <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:rgba(255,255,255,.06);border:0.5px solid rgba(255,255,255,.1)"></div><span style="font-size:9px;color:rgba(255,255,255,.35)">Por definir</span></div>
       </div>
     </div>`;
-
     let html=gridRow(row1)+gridRow(row2)+copaHtml+gridRow(row3)+gridRow(row4);
 
 
