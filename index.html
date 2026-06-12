@@ -1726,7 +1726,7 @@ const BRACKET_CHAIN = {
 };
 
 // Resolve a team slot recursively from predictions
-function resolveTeamSlot(slot, predictions, standings, thirdAssignments, depth=0, contextMid=null) {
+function resolveTeamSlot(slot, predictions, standings, thirdAssignments, depth=0, contextMid=null, bestThirds=[]) {
   if(depth > 10) return slot;
 
   // Group 1st/2nd place
@@ -1739,6 +1739,14 @@ function resolveTeamSlot(slot, predictions, standings, thirdAssignments, depth=0
   // 3rd place slot - use contextMid to look up assignment
   if(slot === '3r') {
     if(contextMid && thirdAssignments[contextMid]) return thirdAssignments[contextMid];
+    // Fallback: return best available third not already used
+    if(bestThirds && bestThirds.length > 0) {
+      // Find first third not already assigned to another match
+      const used = Object.values(thirdAssignments);
+      const available = bestThirds.find(t => !used.includes(t.team));
+      if(available) return available.team;
+      return bestThirds[0]?.team || '?';
+    }
     return '?';
   }
 
@@ -1762,7 +1770,7 @@ function resolveTeamSlot(slot, predictions, standings, thirdAssignments, depth=0
       }
     }
     // Pass mid as context for 3r slots
-    return resolveTeamSlot(winSlot, predictions, standings, thirdAssignments, depth+1, mid);
+    return resolveTeamSlot(winSlot, predictions, standings, thirdAssignments, depth+1, mid, bestThirds);
   }
 
   // Runner up (loser of SF)
@@ -1784,7 +1792,7 @@ function resolveTeamSlot(slot, predictions, standings, thirdAssignments, depth=0
         loseSlot = chain.a;
       }
     }
-    return resolveTeamSlot(loseSlot, predictions, standings, thirdAssignments, depth+1, mid);
+    return resolveTeamSlot(loseSlot, predictions, standings, thirdAssignments, depth+1, mid, bestThirds);
   }
 
   return slot;
@@ -1806,18 +1814,30 @@ function getMatchTeams(match, predictions) {
   if(chain.h === '3r') {
     home = thirdAssignments[match.id] || match.home;
   } else {
-    home = resolveTeamSlot(chain.h, predictions, standings, thirdAssignments, 0, match.id);
+    home = resolveTeamSlot(chain.h, predictions, standings, thirdAssignments, 0, match.id, bestThirds);
   }
 
   if(chain.a === '3r') {
     away = thirdAssignments[match.id] || match.away;
   } else {
-    away = resolveTeamSlot(chain.a, predictions, standings, thirdAssignments, 0, match.id);
+    away = resolveTeamSlot(chain.a, predictions, standings, thirdAssignments, 0, match.id, bestThirds);
   }
 
-  // Clean up unknown slots
-  if(!home || home === '?' || home.length > 30) home = match.home;
-  if(!away || away === '?' || away.length > 30) away = match.away;
+  // Clean up unknown slots — if '?', try to show best third available
+  const cleanSlot=(val, matchDefault)=>{
+    if(!val || val==='?'){
+      // Try to get any available third place as placeholder
+      if(bestThirds&&bestThirds.length>0) return bestThirds[0]?.team||matchDefault;
+      return matchDefault;
+    }
+    // If it looks like a raw match label (contains '/'), strip it
+    if(val.includes(' / ')) return val.split(' / ')[0];
+    // If too long, use match default
+    if(val.length>30) return matchDefault;
+    return val;
+  };
+  home = cleanSlot(home, match.home);
+  away = cleanSlot(away, match.away);
 
   return {home, away};
 }
