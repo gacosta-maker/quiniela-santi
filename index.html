@@ -1957,13 +1957,18 @@ function flag(team){
 }
 
 // Lock date: June 10, 2026
-const LOCK_DATE = new Date('2026-06-11T13:00:00');
-function isLocked(){return new Date() >= LOCK_DATE;}
+const LOCK_DATE_ELIM = new Date('2026-06-11T13:00:00'); // R32 en adelante
+function isLocked(phase){
+  // Fase de grupos: siempre bloqueada (ya pasó el 10 de junio)
+  if(!phase || phase==='g') return true;
+  // Fases eliminatorias: bloqueadas a partir del partido inaugural
+  return new Date() >= LOCK_DATE_ELIM;
+}
 
 // Countdown to lock
 function getCountdown(){
   const now=new Date();
-  const lock=new Date('2026-06-11T13:00:00');
+  const lock=new Date('2026-06-11T13:00:00'); // Para countdown eliminatorias
   const diff=lock-now;
   if(diff<=0) return null;
   const days=Math.floor(diff/(1000*60*60*24));
@@ -1982,8 +1987,8 @@ function renderCountdownBanner(){
     html+=`<div class="countdown-banner ${cls}">
       <span class="cd-icon">${icon}</span>
       <div class="cd-text">
-        <div class="cd-title" style="color:${color}">La quiniela cierra el 10 de junio</div>
-        <div class="cd-sub">El Mundial 2026 inicia el <strong>11 de junio</strong>. Después del cierre solo podrás ver tus predicciones y el ranking.</div>
+        <div class="cd-title" style="color:${color}">¡Captura tus fases eliminatorias!</div>
+        <div class="cd-sub">La fase de grupos está cerrada. Las eliminatorias cierran hoy <strong>11 de junio a las 13:00 hrs</strong>.</div>
       </div>
       <div class="cd-days" style="color:${color}">${cd.days}d ${cd.hrs}h</div>
     </div>`;
@@ -2004,7 +2009,7 @@ function renderPagoBanner(){
 
 function renderGeneralView(match){
   if(!match){match=allMatches[currentMatchIdx];}
-  const locked=isLocked();
+  const locked=isLocked(currentPhaseFilter);
   const phaseMatches=allMatches.filter(m=>m.phase===currentPhaseFilter);
   const items=phaseMatches.map(m=>{
     const mt=getMatchTeams(m,userPredictions);
@@ -2228,7 +2233,7 @@ function renderMatch(){
     </div>`;
   }
 
-  const lockBannerEarly=locked?`<div class="lock-banner"><span class="lock-banner-icon">🔒</span><div><div class="lock-banner-text">La quiniela está cerrada</div><div class="lock-banner-sub">Ya no es posible modificar predicciones.</div></div></div>`:'';
+  const lockBannerEarly=locked?`<div class="lock-banner"><span class="lock-banner-icon">🔒</span><div><div class="lock-banner-text">${currentPhaseFilter==='g'?'Fase de grupos cerrada':'Eliminatorias cerradas — captura hasta las 13:00 hrs'}</div><div class="lock-banner-sub">Ya no es posible modificar predicciones de esta fase.</div></div></div>`:'';
 
 
   const viewToggleHtml=`<div class="view-toggle">
@@ -2351,7 +2356,8 @@ function findAffectedKOMatches(before, after) {
 }
 
 window.saveMatch=async function(){
-  if(isLocked()){alert("La quiniela está cerrada. Ya no se pueden modificar predicciones.");return;}
+  const matchPhase=allMatches[currentMatchIdx]?.phase||'g';
+  if(isLocked(matchPhase)){alert(matchPhase==='g'?"La fase de grupos está cerrada.":"La quiniela eliminatoria cierra a las 13:00 hrs.");return;}
   const h=document.getElementById("scoreH").value,a=document.getElementById("scoreA").value;
   if(h===''||a===''){alert("Ingresa el marcador de ambos equipos");return;}
   const match=allMatches[currentMatchIdx];
