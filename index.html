@@ -1667,7 +1667,7 @@ function getBestThirds(standings) {
     gd: teams[2]?.gd || 0,
     gf: teams[2]?.gf || 0,
     played: teams[2]?.played || 0,
-  })).filter(t => t.team && t.played > 0); // only groups with played matches
+  })).filter(t => t.team); // include all groups with a 3rd place team
 
   thirds.sort((a,b) => {
     if(b.pts !== a.pts) return b.pts - a.pts;
