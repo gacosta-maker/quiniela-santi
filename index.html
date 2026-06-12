@@ -1957,7 +1957,7 @@ function flag(team){
 }
 
 // Lock date: June 10, 2026
-const LOCK_DATE_ELIM = new Date('2026-06-11T13:00:00'); // R32 en adelante
+const LOCK_DATE_ELIM = new Date('2026-06-11T23:59:00'); // R32 en adelante
 function isLocked(phase){
   // Fase de grupos: siempre bloqueada (ya pasó el 10 de junio)
   if(!phase || phase==='g') return true;
@@ -1988,7 +1988,7 @@ function renderCountdownBanner(){
       <span class="cd-icon">${icon}</span>
       <div class="cd-text">
         <div class="cd-title" style="color:${color}">¡Captura tus fases eliminatorias!</div>
-        <div class="cd-sub">La fase de grupos está cerrada. Las eliminatorias cierran hoy <strong>11 de junio a las 13:00 hrs</strong>.</div>
+        <div class="cd-sub">La fase de grupos está cerrada. Las eliminatorias cierran hoy <strong>11 de junio a las 23:59 hrs</strong>.</div>
       </div>
       <div class="cd-days" style="color:${color}">${cd.days}d ${cd.hrs}h</div>
     </div>`;
@@ -2184,7 +2184,7 @@ function renderMatch(){
   const total=allMatches.length;
   const pct=Math.round((predicted/total)*100);
   const cur=userPredictions[match.id];
-  const locked=isLocked();
+  const locked=isLocked(match.phase);
   const matchTeams=getMatchTeams(match, userPredictions);
 
   const phaseConfig={
@@ -2233,7 +2233,7 @@ function renderMatch(){
     </div>`;
   }
 
-  const lockBannerEarly=locked?`<div class="lock-banner"><span class="lock-banner-icon">🔒</span><div><div class="lock-banner-text">${currentPhaseFilter==='g'?'Fase de grupos cerrada':'Eliminatorias cerradas — captura hasta las 13:00 hrs'}</div><div class="lock-banner-sub">Ya no es posible modificar predicciones de esta fase.</div></div></div>`:'';
+  const lockBannerEarly=locked?`<div class="lock-banner"><span class="lock-banner-icon">🔒</span><div><div class="lock-banner-text">${currentPhaseFilter==='g'?'Fase de grupos cerrada':'Eliminatorias cerradas — solo lectura'}</div><div class="lock-banner-sub">Ya no es posible modificar predicciones de esta fase.</div></div></div>`:'';
 
 
   const viewToggleHtml=`<div class="view-toggle">
@@ -2357,7 +2357,7 @@ function findAffectedKOMatches(before, after) {
 
 window.saveMatch=async function(){
   const matchPhase=allMatches[currentMatchIdx]?.phase||'g';
-  if(isLocked(matchPhase)){alert(matchPhase==='g'?"La fase de grupos está cerrada.":"La quiniela eliminatoria cierra a las 13:00 hrs.");return;}
+  if(isLocked(matchPhase)){alert(matchPhase==='g'?"La fase de grupos está cerrada.":"La quiniela eliminatoria cierra hoy a las 23:59 hrs.");return;}
   const h=document.getElementById("scoreH").value,a=document.getElementById("scoreA").value;
   if(h===''||a===''){alert("Ingresa el marcador de ambos equipos");return;}
   const match=allMatches[currentMatchIdx];
