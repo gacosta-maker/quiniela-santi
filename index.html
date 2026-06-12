@@ -1810,6 +1810,12 @@ function getMatchTeams(match, predictions) {
   const standings = getAllStandings(predictions);
   const bestThirds = getBestThirds(standings);
   const thirdAssignments = assignThirdsToSlots(bestThirds);
+  // DEBUG - expose to window for console inspection
+  if(!window._quinielaDebug) {
+    const combo = bestThirds.slice(0,8).map(t=>t.groupId).sort().join('');
+    window._quinielaDebug = {combo, bestThirds:bestThirds.slice(0,8), thirdAssignments, standings};
+    console.log('[DEBUG] Combo:', combo, '| Existe:', !!FIFA_THIRD_ASSIGNMENTS[combo], '| Assignments:', thirdAssignments);
+  }
 
   const chain = BRACKET_CHAIN[match.id];
   if(!chain) return {home: match.home, away: match.away};
@@ -1830,11 +1836,24 @@ function getMatchTeams(match, predictions) {
   }
 
   // Clean up unknown slots
-  if(!home || home === '?') home = match.home;
-  if(!away || away === '?') away = match.away;
-  // If it looks like a raw match label (contains '/'), it's already resolved or fallback is fine
-  if(home && home.length > 30) home = match.home;
-  if(away && away.length > 30) away = match.away;
+  const cleanMatchLabel = (val, matchDefault) => {
+    if(!val || val === '?') {
+      // matchDefault might be '1E / Pos. Tres' — extract just the slot
+      if(matchDefault && matchDefault.includes(' / ')) {
+        return matchDefault.split(' / ')[0].trim(); // e.g. '1E'
+      }
+      return matchDefault;
+    }
+    if(val.length > 30) {
+      if(matchDefault && matchDefault.includes(' / ')) {
+        return matchDefault.split(' / ')[0].trim();
+      }
+      return matchDefault;
+    }
+    return val;
+  };
+  home = cleanMatchLabel(home, match.home);
+  away = cleanMatchLabel(away, match.away);
 
   return {home, away};
 }
