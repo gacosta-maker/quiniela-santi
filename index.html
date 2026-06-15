@@ -346,10 +346,13 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
 
 /* GENERAL VIEW */
 .general-grid{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
-.general-match{background:var(--white);border:1.5px solid var(--border);border-radius:12px;padding:10px 14px;display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;transition:.2s}
+.general-match{background:var(--white);border:1.5px solid var(--border);border-radius:12px;padding:10px 14px;display:grid;grid-template-columns:28px 1fr auto 1fr;gap:8px;align-items:center;transition:.2s}
 .general-match.done{border-color:rgba(22,163,74,.4);background:rgba(22,163,74,.02)}
+.general-match.exact{border-color:rgba(234,179,8,.5);background:rgba(234,179,8,.03)}
+.general-match.wrong{border-color:rgba(220,38,38,.25);background:rgba(220,38,38,.02)}
 .general-match.pending{border-color:var(--border)}
 .general-match:hover{box-shadow:var(--shadow)}
+.gm-result-icon{display:flex;align-items:center;justify-content:center;font-size:18px;line-height:1}
 .gm-team{display:flex;flex-direction:column;align-items:center;gap:6px}
 .gm-flag{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#fff,#f0f4f8);border:2px solid var(--border);box-shadow:0 2px 6px rgba(0,0,0,.08);overflow:hidden}
 .gm-flag img{width:24px;height:18px;object-fit:cover;border-radius:3px}
@@ -393,7 +396,7 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
   .rank-row{grid-template-columns:36px 1fr 44px 48px 52px repeat(5,48px);padding:10px 8px;gap:3px}
   .opp-bar-bg{width:36px}
   .detail-grid{grid-template-columns:repeat(3,1fr)}
-  .general-match{gap:6px;padding:8px 10px}
+  .general-match{gap:5px;padding:8px 8px;grid-template-columns:22px 1fr auto 1fr}
   .gm-input{width:40px;height:40px;font-size:20px}
   .gm-flag{width:32px;height:32px}
   .gm-name{font-size:9px;max-width:56px}
@@ -1860,7 +1863,7 @@ function getMatchTeams(match, predictions) {
   return {home, away};
 }
 
-let currentUser=null,currentMatchIdx=0,userPredictions={},adminUnlocked=false,currentPhaseFilter='g',currentView='one',adminSection='pagos';
+let currentUser=null,currentMatchIdx=0,userPredictions={},adminUnlocked=false,currentPhaseFilter='g',currentView='one',adminSection='pagos',realResults={};
 
 window.loginWithGoogle=async function(){
   const provider=new GoogleAuthProvider();
@@ -1960,12 +1963,14 @@ window.goToQuiniela=async function(){
   showPage("quiniela");
   document.getElementById("quinielaContainer").innerHTML='<div class="loading"><div class="spinner"></div><span>Cargando tu quiniela...</span></div>';
   try{
-    const [snap,pagosDoc]=await Promise.all([
+    const [snap,pagosDoc,realDoc]=await Promise.all([
       getDoc(doc(db,"quinielas",currentUser.uid)),
-      getDoc(doc(db,"config","pagos"))
+      getDoc(doc(db,"config","pagos")),
+      getDoc(doc(db,"config","resultados_reales"))
     ]);
     const pagos=pagosDoc.exists()?pagosDoc.data():{};
     userIsPaid=pagos[currentUser.uid]===true;
+    realResults=realDoc.exists()?realDoc.data():{};
     userPredictions=snap.exists()?(snap.data().predicciones||{}):{};
     let idx=allMatches.findIndex(m=>userPredictions[m.id]===undefined);
     currentMatchIdx=idx===-1?0:idx;
@@ -2053,7 +2058,25 @@ function renderGeneralView(match){
     const mt=getMatchTeams(m,userPredictions);
     const cur=userPredictions[m.id];
     const done=cur!==undefined;
-    return `<div class="general-match ${done?'done':'pending'}" id="gm_${m.id}">
+    // Check real result for this match
+    const realR=realResults&&realResults[m.id];
+    let resultIcon='<div style="width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border)"></div>';
+    let finalScore='';
+    let matchClass=done?'done':'pending';
+    if(realR&&done){
+      const rw=realR.h>realR.a?'h':realR.h<realR.a?'a':'d';
+      const pw=cur.h>cur.a?'h':cur.h<cur.a?'a':'d';
+      const isExact=cur.h===realR.h&&cur.a===realR.a;
+      if(isExact){resultIcon='⭐';matchClass='exact';}
+      else if(rw===pw){resultIcon='<i class="ti ti-check" style="font-size:18px;color:var(--green)"></i>';matchClass='done';}
+      else{resultIcon='<i class="ti ti-x" style="font-size:18px;color:var(--red)"></i>';matchClass='wrong';}
+      finalScore=`<div style="font-size:10px;color:var(--muted);margin-top:2px">Final: ${realR.h} - ${realR.a}</div>`;
+    } else if(realR&&!done){
+      resultIcon='<i class="ti ti-minus" style="font-size:16px;color:var(--muted)"></i>';
+      finalScore=`<div style="font-size:10px;color:var(--muted);margin-top:2px">Final: ${realR.h} - ${realR.a}</div>`;
+    }
+    return `<div class="general-match ${matchClass}" id="gm_${m.id}">
+      <div class="gm-result-icon">${resultIcon}</div>
       <div class="gm-team">
         <div class="gm-flag">${flag(mt.home)}</div>
         <div class="gm-name">${mt.home}</div>
@@ -2064,6 +2087,7 @@ function renderGeneralView(match){
           <div class="gm-dash">:</div>
           <input class="gm-input${done?' has-val':''}" id="ga_${m.id}" type="number" min="0" max="20" placeholder="–" value="${done?cur.a:''}" ${locked?'disabled':''} onchange="checkGenPenalty('${m.id}')">
         </div>
+        ${finalScore}
         ${m.phase!=='g'?`<div class="gm-penalty-wrap" id="gpw_${m.id}" style="${done&&cur.h===cur.a?'display:flex':'display:none'}">
           <div style="display:flex;flex-direction:column;align-items:center">
             <div class="gm-pen-label">🥅 PEN</div>
