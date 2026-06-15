@@ -2526,41 +2526,98 @@ function showCompletedState(){
 
 function calcOpportunities(preds, real) {
   // Returns opp/acc/exact per phase including groups
+  // For groups: opp = 72 always (fixed matches)
+  // For KO phases: opp = matches where the REAL teams match the USER's predicted teams
   const phases = ['g','r32','oct','qf','sf','final'];
   const totals = {g:72, r32:16, oct:8, qf:4, sf:2, final:1};
   const result = {};
+
+  // Pre-compute user's predicted teams for each KO match
+  const userStandings = getAllStandings(preds);
+  const userBestThirds = getBestThirds(userStandings);
+  const userThirdAssign = assignThirdsToSlots(userBestThirds);
+
+  // Pre-compute real teams for each KO match (from real results)
+  const realStandings = getAllStandings(real);
+  const realBestThirds = getBestThirds(realStandings);
+  const realThirdAssign = assignThirdsToSlots(realBestThirds);
+
   phases.forEach(ph => {
     const phMatches = allMatches.filter(m => m.phase === ph);
     let opp=0, acc=0, exact=0, available=false;
-    phMatches.forEach(m => {
-      const r = real[m.id];
-      const p = preds[m.id];
-      if(!r) return; // no real result yet
+
+    if(ph === 'g') {
+      // Groups: all 72 are opportunities regardless
+      opp = 72;
       available = true;
-      opp++;
-      if(!p) return;
-      // Check winner/draw match
-      const rw = r.h>r.a?'h':r.h<r.a?'a':'d';
-      const pw = p.h>p.a?'h':p.h<p.a?'a':'d';
-      const isKO = ph !== 'g';
-      const rDraw = r.h===r.a;
-      if(rw===pw) {
-        if(isKO && rDraw) {
-          // KO draw: check penalty winner
-          if(r.ph!==undefined && p.ph!==undefined) {
-            const rPW = r.ph>r.pa?'h':'a';
-            const pPW = p.ph>p.pa?'h':'a';
-            if(rPW===pPW) { acc++; }
-          } else { acc++; }
-        } else { acc++; }
-        // Check exact
-        if(p.h===r.h && p.a===r.a) {
-          if(isKO && rDraw) {
-            if(r.ph!==undefined && p.ph!==undefined && p.ph===r.ph && p.pa===r.pa) exact++;
-          } else { exact++; }
+      phMatches.forEach(m => {
+        const r = real[m.id];
+        const p = preds[m.id];
+        if(!r || !p) return;
+        available = true;
+        const rw = r.h>r.a?'h':r.h<r.a?'a':'d';
+        const pw = p.h>p.a?'h':p.h<p.a?'a':'d';
+        if(rw===pw) {
+          acc++;
+          if(p.h===r.h && p.a===r.a) exact++;
         }
-      }
-    });
+      });
+    } else {
+      // KO phases: opp = matches where real teams == user's predicted teams
+      phMatches.forEach(m => {
+        const r = real[m.id];
+        const p = preds[m.id];
+
+        // Get real teams for this match (resolved from real results)
+        const realTeams = getMatchTeams(m, real);
+        const realHome = realTeams.home;
+        const realAway = realTeams.away;
+
+        // Check if real teams are known (not still a slot label)
+        const realKnown = realHome && realAway &&
+          !realHome.includes('/') && !realHome.match(/^[12][A-L]$/) &&
+          !realHome.match(/^[WR]m/) && realHome !== '?' &&
+          !realAway.includes('/') && !realAway.match(/^[12][A-L]$/) &&
+          !realAway.match(/^[WR]m/) && realAway !== '?';
+
+        if(!realKnown) return; // teams not yet defined in real results
+        available = true;
+
+        // Get user's predicted teams for this match
+        const userTeams = getMatchTeams(m, preds);
+        const userHome = userTeams.home;
+        const userAway = userTeams.away;
+
+        // Check if user's predicted teams match real teams (order independent)
+        const teamsMatch = (
+          (userHome === realHome && userAway === realAway) ||
+          (userHome === realAway && userAway === realHome)
+        );
+
+        if(!teamsMatch) return; // user predicted different teams for this match
+        opp++;
+
+        // If match has real result, check acc/exact
+        if(!r || !p) return;
+        const rw = r.h>r.a?'h':r.h<r.a?'a':'d';
+        const pw = p.h>p.a?'h':p.h<p.a?'a':'d';
+        const rDraw = r.h===r.a;
+        if(rw===pw) {
+          if(rDraw) {
+            if(r.ph!==undefined && p.ph!==undefined) {
+              const rPW = r.ph>r.pa?'h':'a';
+              const pPW = p.ph>p.pa?'h':'a';
+              if(rPW===pPW) acc++;
+            } else acc++;
+          } else acc++;
+          if(p.h===r.h && p.a===r.a) {
+            if(rDraw) {
+              if(r.ph!==undefined && p.ph!==undefined && p.ph===r.ph && p.pa===r.pa) exact++;
+            } else exact++;
+          }
+        }
+      });
+    }
     result[ph] = { opp, acc, exact, total: totals[ph], available };
   });
   return result;
@@ -2680,7 +2737,12 @@ window.loadRanking=async function(){
         const userDone=Object.keys(p.preds).filter(id=>allMatches.find(m=>m.id===id&&m.phase===ph)).length;
 
         if(!o||!o.available||o.opp===null){
-          if(userDone===0) return `<span style="text-align:center;font-size:11px;color:var(--light)">—/${phTotal}</span>`;
+          if(ph==='g') {
+            if(userDone===0) return `<span style="text-align:center;font-size:11px;color:var(--light)">—/${phTotal}</span>`;
+          } else {
+            // KO phase: show 0/total when no real matches defined yet
+            return `<span style="text-align:center;font-size:11px;color:var(--light)">0/${phTotal}</span>`;
+          }
           const pct=Math.round(userDone/phTotal*100);
           return `<span><div class="opp-cell"><div class="opp-val" style="color:${PHASE_COLORS[ph]};opacity:.5">${userDone}/${phTotal}</div><div class="opp-bar-bg"><div class="opp-bar" style="width:${pct}%;background:${PHASE_COLORS[ph]};opacity:.4"></div></div></div></span>`;
         }
