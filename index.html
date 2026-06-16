@@ -2606,22 +2606,20 @@ function calcOpportunities(preds, real) {
 
         if(!realKnown) return; // teams not yet defined in real results
 
-        // Extra check for R32: only count as defined if all source groups are complete (6/6 played)
+        // Extra check for R32: only count if both source groups have at least 1 real result
         if(ph === 'r32') {
-          // Get slots for this match
           const chain = BRACKET_CHAIN[m.id];
           if(chain) {
-            // Extract group letters from slots like '1A','2B','3r'
             const groupsNeeded = [];
             [chain.h, chain.a].forEach(slot => {
               if(slot && /^[12][A-L]$/.test(slot)) groupsNeeded.push(slot[1]);
             });
-            // Check all needed groups have 6 played matches
-            const allGroupsComplete = groupsNeeded.every(g => {
+            // Both groups must have at least 1 played match
+            const bothHaveResults = groupsNeeded.every(g => {
               const gMatchIds = GROUP_MATCHES[g] || [];
-              return gMatchIds.every(mid => real[mid] !== undefined);
+              return gMatchIds.some(mid => real[mid] !== undefined);
             });
-            if(!allGroupsComplete) return; // group not finished yet
+            if(!bothHaveResults) return;
           }
         }
         available = true;
@@ -3429,23 +3427,37 @@ window.loadGrupos=async function(){
     // Copa central con bracket
 
     // BRACKET DINÁMICO CON BANDERAS
-    const resolveRealSlot=(slot,rs)=>{
+    const rs2={};
+    Object.keys(GROUPS).forEach(g=>{rs2[g]=calcGroupStandings(g,real);});
+
+    // Pre-calculate real thirds for the bracket
+    const realThirds2=getBestThirds(getAllStandings(real));
+    const realThirdAssign2=assignThirdsToSlots(realThirds2);
+    // matchId → third team name
+    const realThirdTeams2={};
+    Object.entries(realThirdAssign2).forEach(([mid,team])=>{realThirdTeams2[mid]=team;});
+
+    // contextMid needed for 3r slots — map slot index in dynMatch2 calls to match IDs
+    // R32 left: m73,m74,m75,m76,m77,m78,m79,m80 | right: m81,m82,m83,m84,m85,m86,m87,m88
+    const resolveRealSlot=(slot,rs,contextMid)=>{
       if(!slot||slot==='·'||slot===null) return null;
       if(slot.length===2&&'12'.includes(slot[0])&&/[A-L]/.test(slot[1])){
         const pos=parseInt(slot[0])-1, grp=slot[1], st=rs[grp];
         if(st&&st[pos]&&st[pos].played>0) return {team:st[pos].team,isLeader:pos===0};
       }
+      if(slot==='3r'&&contextMid){
+        const team=realThirdTeams2[contextMid];
+        if(team) return {team,isLeader:false,isThird:true};
+      }
       return null;
     };
-    const rs2={};
-    Object.keys(GROUPS).forEach(g=>{rs2[g]=calcGroupStandings(g,real);});
     const champReal2=(()=>{const fm=allMatches.find(m=>m.phase==='final');return fm&&real[fm.id]?(real[fm.id].h>real[fm.id].a?fm.home:fm.away):'';})();
     const mkTeam2=(r,slot)=>{
-      if(r){const fl=flag(r.team);const bg=r.isLeader?'background:rgba(22,163,74,.18);':'';return `<div style="padding:4px 6px;display:flex;align-items:center;gap:5px;${bg}overflow:hidden"><div style="flex-shrink:0">${fl}</div><span style="font-size:9px;font-weight:500;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.team}</span></div>`;}
+      if(r){const fl=flag(r.team);const bg=r.isLeader?'background:rgba(22,163,74,.18);':r.isThird?'background:rgba(234,179,8,.12);':'';return `<div style="padding:4px 6px;display:flex;align-items:center;gap:5px;${bg}overflow:hidden"><div style="flex-shrink:0">${fl}</div><span style="font-size:9px;font-weight:500;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.team}</span></div>`;}
       return `<div style="padding:4px 6px"><span style="font-size:8px;color:rgba(255,255,255,.2)">${slot||'·'}</span></div>`;
     };
-    const dynMatch2=(sH,sA)=>{
-      const rH=resolveRealSlot(sH,rs2),rA=resolveRealSlot(sA,rs2);
+    const dynMatch2=(sH,sA,mid=null)=>{
+      const rH=resolveRealSlot(sH,rs2,mid),rA=resolveRealSlot(sA,rs2,mid);
       const filled=rH||rA;
       return `<div style="background:${filled?'rgba(255,255,255,.1)':'rgba(255,255,255,.05)'};border:0.5px solid ${filled?'rgba(255,255,255,.2)':'rgba(255,255,255,.08)'};border-radius:5px;overflow:hidden;width:110px">${mkTeam2(rH,sH)}<div style="height:0.5px;background:rgba(255,255,255,.1)"></div>${mkTeam2(rA,sA)}</div>`;
     };
@@ -3454,7 +3466,7 @@ window.loadGrupos=async function(){
     const copaHtml=`<div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:16px;padding:18px 10px;margin:4px 0 12px;overflow-x:auto">
       <div style="text-align:center;margin-bottom:12px"><span style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,.3)">Progresión al campeonato</span></div>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:5px;min-width:620px">
-        ${dynCol2('R32',0,dynMatch2('2A','2B')+dynMatch2('1E','3r')+dynMatch2('1F','2C')+dynMatch2('1C','2F')+dynMatch2('1I','3r')+dynMatch2('2E','2I')+dynMatch2('1A','3r')+dynMatch2('1L','3r'))}
+        ${dynCol2('R32',0,dynMatch2('2A','2B','m73')+dynMatch2('1E','3r','m74')+dynMatch2('1F','2C','m75')+dynMatch2('1C','2F','m76')+dynMatch2('1I','3r','m77')+dynMatch2('2E','2I','m78')+dynMatch2('1A','3r','m79')+dynMatch2('1L','3r','m80'))}
         ${dynCol2('Oct',12,e+e+e+e)}
         ${dynCol2('Cuar',28,e+e)}
         ${dynCol2('Semi',55,e)}
@@ -3469,7 +3481,7 @@ window.loadGrupos=async function(){
         ${dynCol2('Semi',55,e)}
         ${dynCol2('Cuar',28,e+e)}
         ${dynCol2('Oct',12,e+e+e+e)}
-        ${dynCol2('R32',0,dynMatch2('1D','3r')+dynMatch2('1G','3r')+dynMatch2('2K','2L')+dynMatch2('1H','2J')+dynMatch2('1B','3r')+dynMatch2('1J','2H')+dynMatch2('1K','3r')+dynMatch2('2D','2G'))}
+        ${dynCol2('R32',0,dynMatch2('1D','3r','m81')+dynMatch2('1G','3r','m82')+dynMatch2('2K','2L','m83')+dynMatch2('1H','2J','m84')+dynMatch2('1B','3r','m85')+dynMatch2('1J','2H','m86')+dynMatch2('1K','3r','m87')+dynMatch2('2D','2G','m88'))}
       </div>
       <div style="display:flex;gap:12px;margin-top:10px;padding-top:8px;border-top:0.5px solid rgba(255,255,255,.08);justify-content:center">
         <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:rgba(22,163,74,.4)"></div><span style="font-size:9px;color:rgba(255,255,255,.35)">Líder del grupo</span></div>
