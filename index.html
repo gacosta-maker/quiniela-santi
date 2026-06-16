@@ -2605,6 +2605,25 @@ function calcOpportunities(preds, real) {
           !realAway.match(/^[WR]m/) && realAway !== '?';
 
         if(!realKnown) return; // teams not yet defined in real results
+
+        // Extra check for R32: only count as defined if all source groups are complete (6/6 played)
+        if(ph === 'r32') {
+          // Get slots for this match
+          const chain = BRACKET_CHAIN[m.id];
+          if(chain) {
+            // Extract group letters from slots like '1A','2B','3r'
+            const groupsNeeded = [];
+            [chain.h, chain.a].forEach(slot => {
+              if(slot && /^[12][A-L]$/.test(slot)) groupsNeeded.push(slot[1]);
+            });
+            // Check all needed groups have 6 played matches
+            const allGroupsComplete = groupsNeeded.every(g => {
+              const gMatchIds = GROUP_MATCHES[g] || [];
+              return gMatchIds.every(mid => real[mid] !== undefined);
+            });
+            if(!allGroupsComplete) return; // group not finished yet
+          }
+        }
         available = true;
 
         // Get user's predicted teams for this match
@@ -3462,29 +3481,94 @@ window.loadGrupos=async function(){
 
 
 
-    // Best thirds section
-    if(bestThirds.some(t=>t.pts>0)){
-      html+=`<div style="margin-top:24px;background:#fff;border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)">
-        <div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--off);display:flex;align-items:center;gap:10px">
-          <span style="font-size:20px">⭐</span>
-          <span style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted)">Mejores Terceros — Top 8 clasifican</span>
+    // Best thirds section — always show
+    {
+      // Calculate rival for each top-8 third using FIFA table
+      const top8 = bestThirds.slice(0,8);
+      const combo = top8.map(t=>t.groupId).sort().join('');
+      const slotMap = FIFA_THIRD_ASSIGNMENTS[combo]||{};
+      // Invert slotMap: {matchId:groupId} → {groupId:matchId}
+      const groupToMatch = {};
+      Object.entries(slotMap).forEach(([mid,gid])=>{ groupToMatch[gid]=mid; });
+      // matchId → opponent label (e.g. m74 → '1E')
+      const matchToOpponent = {
+        'm79':'1A','m85':'1B','m81':'1D','m74':'1E',
+        'm82':'1G','m77':'1I','m87':'1K','m80':'1L'
+      };
+      // Resolve opponent team name from real standings
+      const oppTeamName = (slot)=>{
+        if(!slot) return null;
+        const pos=parseInt(slot[0])-1;
+        const g=slot[1];
+        const st=standings[g];
+        if(st&&st[pos]&&st[pos].played>0) return st[pos].team;
+        return null;
+      };
+
+      html+=`<div style="margin-top:20px;background:linear-gradient(135deg,#0d1f35 0%,#0a1628 100%);border:0.5px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden">
+        <div style="padding:14px 20px;border-bottom:0.5px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:10px">
+          <span style="font-size:18px">⭐</span>
+          <div>
+            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.6)">Mejores Terceros — Top 8 clasifican</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px">El rival en R32 se calcula con la tabla oficial FIFA según los 8 mejores terceros</div>
+          </div>
         </div>
-        <table class="grupo-table">
-          <thead><tr><th>#</th><th>Equipo</th><th>Grupo</th><th>PTS</th><th>GF</th><th>DG</th><th>Estado</th></tr></thead>
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            <th style="padding:8px 12px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.4);border-bottom:0.5px solid rgba(255,255,255,.08);text-align:center">#</th>
+            <th style="padding:8px 12px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.4);border-bottom:0.5px solid rgba(255,255,255,.08);text-align:left">Equipo</th>
+            <th style="padding:8px 12px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.4);border-bottom:0.5px solid rgba(255,255,255,.08);text-align:center">Grupo</th>
+            <th style="padding:8px 12px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.4);border-bottom:0.5px solid rgba(255,255,255,.08);text-align:center">Pts</th>
+            <th style="padding:8px 12px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.4);border-bottom:0.5px solid rgba(255,255,255,.08);text-align:center">PJ</th>
+            <th style="padding:8px 12px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.4);border-bottom:0.5px solid rgba(255,255,255,.08);text-align:center">GF</th>
+            <th style="padding:8px 12px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.4);border-bottom:0.5px solid rgba(255,255,255,.08);text-align:center">DG</th>
+            <th style="padding:8px 12px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.4);border-bottom:0.5px solid rgba(255,255,255,.08);text-align:center">Estado</th>
+            <th style="padding:8px 12px;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.4);border-bottom:0.5px solid rgba(255,255,255,.08);text-align:center">Rival en R32</th>
+          </tr></thead>
           <tbody>`;
+
       bestThirds.forEach((t,i)=>{
         const classifies=i<8;
-        html+=`<tr class="${classifies?'classifies':'eliminated'}">
-          <td><span class="pos-badge ${classifies?'pos-2':'pos-4'}">${i+1}</span></td>
-          <td><div class="team-cell"><div class="team-flag-sm">${flag(t.team)}</div>${t.team}</div></td>
-          <td style="color:var(--muted);font-weight:600">${t.groupId}</td>
-          <td class="pts-cell">${t.pts}</td>
-          <td>${t.gf}</td>
-          <td class="${t.gd>0?'gd-pos':t.gd<0?'gd-neg':''}">${t.gd>0?'+'+t.gd:t.gd}</td>
-          <td>${classifies?'<span class="classifies-badge badge-q">✓ Clasifica</span>':'<span class="classifies-badge" style="background:rgba(220,38,38,.1);color:var(--red)">Eliminado</span>'}</td>
+        const gdClass=t.gd>0?'color:#4ade80':t.gd<0?'color:#f87171':'color:rgba(255,255,255,.5)';
+        const rowBg=classifies?'background:rgba(22,163,74,.06)':'background:rgba(220,38,38,.04);opacity:.65';
+
+        // Calculate rival
+        let rivalHtml='<span style="color:rgba(255,255,255,.25)">—</span>';
+        if(classifies){
+          const matchId=groupToMatch[t.groupId];
+          const oppSlot=matchToOpponent[matchId];
+          if(oppSlot){
+            const oppTeam=oppTeamName(oppSlot);
+            rivalHtml=`<span style="font-size:10px;font-weight:600;color:#93c5fd;background:rgba(59,130,246,.12);border:0.5px solid rgba(59,130,246,.25);border-radius:5px;padding:3px 8px;white-space:nowrap">🆚 ${oppSlot}${oppTeam?' ('+oppTeam+')':''}</span>`;
+          } else {
+            rivalHtml='<span style="font-size:10px;color:rgba(255,255,255,.35)">⏳ Por definir</span>';
+          }
+        }
+
+        html+=`<tr style="${rowBg};border-top:0.5px solid rgba(255,255,255,.06)">
+          <td style="padding:9px 12px;text-align:center">
+            <span style="width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;background:${classifies?'rgba(22,163,74,.2)':'rgba(255,255,255,.06)'};color:${classifies?'#4ade80':'rgba(255,255,255,.4)'}">${i+1}</span>
+          </td>
+          <td style="padding:9px 12px">
+            <div style="display:flex;align-items:center;gap:8px"><div class="team-flag-sm">${flag(t.team)}</div><span style="font-size:12px;color:#fff;font-weight:500">${t.team}</span></div>
+          </td>
+          <td style="padding:9px 12px;text-align:center;font-weight:700;color:#60a5fa;font-size:13px">${t.groupId}</td>
+          <td style="padding:9px 12px;text-align:center;font-weight:700;color:#60a5fa">${t.pts}</td>
+          <td style="padding:9px 12px;text-align:center;color:rgba(255,255,255,.6)">${t.played}</td>
+          <td style="padding:9px 12px;text-align:center;color:rgba(255,255,255,.6)">${t.gf}</td>
+          <td style="padding:9px 12px;text-align:center;${gdClass}">${t.gd>0?'+'+t.gd:t.gd}</td>
+          <td style="padding:9px 12px;text-align:center">
+            ${classifies?'<span style="font-size:9px;background:rgba(22,163,74,.2);color:#4ade80;border:0.5px solid rgba(22,163,74,.3);border-radius:4px;padding:2px 6px;font-weight:600">✓ Clasifica</span>':'<span style="font-size:9px;background:rgba(220,38,38,.15);color:#f87171;border:0.5px solid rgba(220,38,38,.2);border-radius:4px;padding:2px 6px;font-weight:600">Eliminado</span>'}
+          </td>
+          <td style="padding:9px 12px;text-align:center">${rivalHtml}</td>
         </tr>`;
       });
-      html+=`</tbody></table></div>`;
+
+      html+=`</tbody></table>
+        <div style="padding:8px 14px;border-top:0.5px solid rgba(255,255,255,.08)">
+          <span style="font-size:10px;color:rgba(255,255,255,.3)">💡 El rival se actualiza automáticamente conforme se completan los grupos</span>
+        </div>
+      </div>`;
     }
 
     document.getElementById("gruposContent").innerHTML=html;
