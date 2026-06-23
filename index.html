@@ -3322,35 +3322,50 @@ window.loadGrupos=async function(){
     // Copa central con bracket
 
     // BRACKET DINÁMICO CON BANDERAS
-    const resolveRealSlot=(slot,rs)=>{
+    const rs2={};
+    Object.keys(GROUPS).forEach(g=>{rs2[g]=calcGroupStandings(g,real);});
+    // Pre-calculate real thirds for bracket slots
+    const realThirds2=getBestThirds(getAllStandings(real));
+    const realThirdAssign2=assignThirdsToSlots(realThirds2);
+    const realThirdTeams2={};
+    Object.entries(realThirdAssign2).forEach(([mid,team])=>{realThirdTeams2[mid]=team;});
+    const resolveRealSlot=(slot,rs,contextMid)=>{
       if(!slot||slot==='·'||slot===null) return null;
       if(slot.length===2&&'12'.includes(slot[0])&&/[A-L]/.test(slot[1])){
         const pos=parseInt(slot[0])-1, grp=slot[1], st=rs[grp];
         if(st&&st[pos]&&st[pos].played>0) return {team:st[pos].team,isLeader:pos===0};
       }
+      if(slot==='3r'&&contextMid){
+        const team=realThirdTeams2[contextMid];
+        if(team) return {team,isLeader:false,isThird:true};
+      }
       return null;
     };
-    const rs2={};
-    Object.keys(GROUPS).forEach(g=>{rs2[g]=calcGroupStandings(g,real);});
     const champReal2=(()=>{const fm=allMatches.find(m=>m.phase==='final');return fm&&real[fm.id]?(real[fm.id].h>real[fm.id].a?fm.home:fm.away):'';})();
     const mkTeam2=(r,slot)=>{
-      if(r){const fl=flag(r.team);const bg=r.isLeader?'background:rgba(22,163,74,.18);':'';return `<div style="padding:4px 6px;display:flex;align-items:center;gap:5px;${bg}overflow:hidden"><div style="flex-shrink:0">${fl}</div><span style="font-size:9px;font-weight:500;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.team}</span></div>`;}
+      if(r){const fl=flag(r.team);const bg=r.isLeader?'background:rgba(22,163,74,.18);':r.isThird?'background:rgba(234,179,8,.12);':'';return `<div style="padding:4px 6px;display:flex;align-items:center;gap:5px;${bg}overflow:hidden"><div style="flex-shrink:0">${fl}</div><span style="font-size:9px;font-weight:500;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.team}</span></div>`;}
       return `<div style="padding:4px 6px"><span style="font-size:8px;color:rgba(255,255,255,.2)">${slot||'·'}</span></div>`;
     };
-    const dynMatch2=(sH,sA)=>{
-      const rH=resolveRealSlot(sH,rs2),rA=resolveRealSlot(sA,rs2);
+    const dynMatch2=(sH,sA,mid=null)=>{
+      const rH=resolveRealSlot(sH,rs2,mid),rA=resolveRealSlot(sA,rs2,mid);
       const filled=rH||rA;
-      return `<div style="background:${filled?'rgba(255,255,255,.1)':'rgba(255,255,255,.05)'};border:0.5px solid ${filled?'rgba(255,255,255,.2)':'rgba(255,255,255,.08)'};border-radius:5px;overflow:hidden;width:110px">${mkTeam2(rH,sH)}<div style="height:0.5px;background:rgba(255,255,255,.1)"></div>${mkTeam2(rA,sA)}</div>`;
+      const bg=rH?.isThird||rA?.isThird?'rgba(234,179,8,.1)':(filled?'rgba(255,255,255,.1)':'rgba(255,255,255,.05)');
+      return `<div style="background:${bg};border:0.5px solid ${filled?'rgba(255,255,255,.2)':'rgba(255,255,255,.08)'};border-radius:5px;overflow:hidden;width:110px">${mkTeam2(rH,sH)}<div style="height:0.5px;background:rgba(255,255,255,.1)"></div>${mkTeam2(rA,sA)}</div>`;
     };
     const dynCol2=(lbl,sp,ms)=>`<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0"><div style="font-size:8px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.3);text-align:center;margin-bottom:3px">${lbl}</div>${sp?`<div style="height:${sp}px"></div>`:''}${ms}</div>`;
     const e=dynMatch2(null,null);
+    // Altura de cada match cell ≈ 44px, gap=4px → cada par = 92px
+    const mH=44, gH=4;
+    const sp1=mH+gH;        // spacer Oct: 1 match height (centrado entre pares)
+    const sp2=sp1*2+mH+gH;  // spacer Cuar
+    const sp3=sp2*2+mH+gH;  // spacer Semi
     const copaHtml=`<div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:16px;padding:18px 10px;margin:4px 0 12px;overflow-x:auto">
       <div style="text-align:center;margin-bottom:12px"><span style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,.3)">Progresión al campeonato</span></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:5px;min-width:620px">
-        ${dynCol2('R32',0,dynMatch2('2A','2B')+dynMatch2('1E','3r')+dynMatch2('1F','2C')+dynMatch2('1C','2F')+dynMatch2('1I','3r')+dynMatch2('2E','2I')+dynMatch2('1A','3r')+dynMatch2('1L','3r'))}
-        ${dynCol2('Oct',12,e+e+e+e)}
-        ${dynCol2('Cuar',28,e+e)}
-        ${dynCol2('Semi',55,e)}
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:5px;min-width:620px">
+        ${dynCol2('R32',0,dynMatch2('2A','2B','m73')+dynMatch2('1E','3r','m74')+dynMatch2('1F','2C','m75')+dynMatch2('1C','2F','m76')+dynMatch2('1I','3r','m77')+dynMatch2('2E','2I','m78')+dynMatch2('1A','3r','m79')+dynMatch2('1L','3r','m80'))}
+        ${dynCol2('Oct',sp1,e+e+e+e)}
+        ${dynCol2('Cuar',sp2,e+e)}
+        ${dynCol2('Semi',sp3,e)}
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:5px;padding:0 6px;min-width:80px">
           <div style="font-size:46px;line-height:1;filter:drop-shadow(0 0 12px rgba(212,175,55,.5))">🏆</div>
           <div style="font-size:9px;letter-spacing:2px;color:#d4af37;text-transform:uppercase">Mundial 2026</div>
@@ -3359,10 +3374,10 @@ window.loadGrupos=async function(){
             <div style="font-size:11px;font-weight:500;color:#fff">${champReal2||champion||'—'}</div>
           </div>
         </div>
-        ${dynCol2('Semi',55,e)}
-        ${dynCol2('Cuar',28,e+e)}
-        ${dynCol2('Oct',12,e+e+e+e)}
-        ${dynCol2('R32',0,dynMatch2('1D','3r')+dynMatch2('1G','3r')+dynMatch2('2K','2L')+dynMatch2('1H','2J')+dynMatch2('1B','3r')+dynMatch2('1J','2H')+dynMatch2('1K','3r')+dynMatch2('2D','2G'))}
+        ${dynCol2('Semi',sp3,e)}
+        ${dynCol2('Cuar',sp2,e+e)}
+        ${dynCol2('Oct',sp1,e+e+e+e)}
+        ${dynCol2('R32',0,dynMatch2('1D','3r','m81')+dynMatch2('1G','3r','m82')+dynMatch2('2K','2L','m83')+dynMatch2('1H','2J','m84')+dynMatch2('1B','3r','m85')+dynMatch2('1J','2H','m86')+dynMatch2('1K','3r','m87')+dynMatch2('2D','2G','m88'))}
       </div>
       <div style="display:flex;gap:12px;margin-top:10px;padding-top:8px;border-top:0.5px solid rgba(255,255,255,.08);justify-content:center">
         <div style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:2px;background:rgba(22,163,74,.4)"></div><span style="font-size:9px;color:rgba(255,255,255,.35)">Líder del grupo</span></div>
@@ -3374,29 +3389,59 @@ window.loadGrupos=async function(){
 
 
 
-    // Best thirds section
-    if(bestThirds.some(t=>t.pts>0)){
-      html+=`<div style="margin-top:24px;background:#fff;border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)">
-        <div style="padding:14px 20px;border-bottom:1px solid var(--border);background:var(--off);display:flex;align-items:center;gap:10px">
-          <span style="font-size:20px">⭐</span>
-          <span style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted)">Mejores Terceros — Top 8 clasifican</span>
+    // Best thirds section — always show, dark theme, full columns + rival
+    {
+      const top8=bestThirds.slice(0,8);
+      const combo=top8.map(t=>t.groupId).sort().join('');
+      const slotMap=FIFA_THIRD_ASSIGNMENTS[combo]||{};
+      const groupToMatch={};
+      Object.entries(slotMap).forEach(([mid,gid])=>{groupToMatch[gid]=mid;});
+      const matchToOpponent={'m79':'1A','m85':'1B','m81':'1D','m74':'1E','m82':'1G','m77':'1I','m87':'1K','m80':'1L'};
+      const oppTeamName=(slot)=>{
+        if(!slot) return null;
+        const pos=parseInt(slot[0])-1,g=slot[1],st=standings[g];
+        if(st&&st[pos]&&st[pos].played>0) return st[pos].team;
+        return null;
+      };
+      html+=`<div style="margin-top:20px;background:linear-gradient(135deg,#0d1f35 0%,#0a1628 100%);border:0.5px solid rgba(255,255,255,.1);border-radius:16px;overflow:hidden">
+        <div style="padding:14px 20px;border-bottom:0.5px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:10px">
+          <span style="font-size:18px">⭐</span>
+          <div>
+            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:rgba(255,255,255,.6)">Mejores Terceros — Top 8 clasifican</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px">Rival en R32 calculado con tabla oficial FIFA</div>
+          </div>
         </div>
-        <table class="grupo-table">
-          <thead><tr><th>#</th><th>Equipo</th><th>Grupo</th><th>PTS</th><th>GF</th><th>DG</th><th>Estado</th></tr></thead>
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr>
+            ${['#','Equipo','Grupo','Pts','PJ','GF','DG','Estado','Rival en R32'].map((h,i)=>`<th style="padding:7px ${i===1?'12px 7px 8px':'8px'};font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.4);border-bottom:0.5px solid rgba(255,255,255,.08);text-align:${i===1?'left':'center'}">${h}</th>`).join('')}
+          </tr></thead>
           <tbody>`;
       bestThirds.forEach((t,i)=>{
-        const classifies=i<8;
-        html+=`<tr class="${classifies?'classifies':'eliminated'}">
-          <td><span class="pos-badge ${classifies?'pos-2':'pos-4'}">${i+1}</span></td>
-          <td><div class="team-cell"><div class="team-flag-sm">${flag(t.team)}</div>${t.team}</div></td>
-          <td style="color:var(--muted);font-weight:600">${t.groupId}</td>
-          <td class="pts-cell">${t.pts}</td>
-          <td>${t.gf}</td>
-          <td class="${t.gd>0?'gd-pos':t.gd<0?'gd-neg':''}">${t.gd>0?'+'+t.gd:t.gd}</td>
-          <td>${classifies?'<span class="classifies-badge badge-q">✓ Clasifica</span>':'<span class="classifies-badge" style="background:rgba(220,38,38,.1);color:var(--red)">Eliminado</span>'}</td>
+        const cl=i<8;
+        const gdC=t.gd>0?'color:#4ade80':t.gd<0?'color:#f87171':'color:rgba(255,255,255,.5)';
+        const rowBg=cl?'background:rgba(22,163,74,.06)':'background:rgba(220,38,38,.04);opacity:.65';
+        const matchId=groupToMatch[t.groupId];
+        const oppSlot=matchToOpponent[matchId];
+        const oppTeam=oppSlot?oppTeamName(oppSlot):null;
+        let rivalHtml=cl
+          ?(oppSlot?`<span style="font-size:10px;font-weight:600;color:#93c5fd;background:rgba(59,130,246,.12);border:0.5px solid rgba(59,130,246,.25);border-radius:5px;padding:3px 8px;white-space:nowrap">🆚 ${oppSlot}${oppTeam?' ('+oppTeam+')':''}</span>`
+            :'<span style="font-size:10px;color:rgba(255,255,255,.35)">⏳ Por definir</span>')
+          :'<span style="color:rgba(255,255,255,.25)">—</span>';
+        html+=`<tr style="${rowBg};border-top:0.5px solid rgba(255,255,255,.06)">
+          <td style="padding:8px;text-align:center"><span style="width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;background:${cl?'rgba(22,163,74,.2)':'rgba(255,255,255,.06)'};color:${cl?'#4ade80':'rgba(255,255,255,.4)'}">${i+1}</span></td>
+          <td style="padding:8px 12px"><div style="display:flex;align-items:center;gap:8px"><div class="team-flag-sm">${flag(t.team)}</div><span style="font-size:12px;color:#fff;font-weight:500">${t.team}</span></div></td>
+          <td style="padding:8px;text-align:center;font-weight:700;color:#60a5fa;font-size:13px">${t.groupId}</td>
+          <td style="padding:8px;text-align:center;font-weight:700;color:#60a5fa">${t.pts}</td>
+          <td style="padding:8px;text-align:center;color:rgba(255,255,255,.6)">${t.played}</td>
+          <td style="padding:8px;text-align:center;color:rgba(255,255,255,.6)">${t.gf}</td>
+          <td style="padding:8px;text-align:center;${gdC}">${t.gd>0?'+'+t.gd:t.gd}</td>
+          <td style="padding:8px;text-align:center">${cl?'<span style="font-size:9px;background:rgba(22,163,74,.2);color:#4ade80;border:0.5px solid rgba(22,163,74,.3);border-radius:4px;padding:2px 6px;font-weight:600">✓ Clasifica</span>':'<span style="font-size:9px;background:rgba(220,38,38,.15);color:#f87171;border:0.5px solid rgba(220,38,38,.2);border-radius:4px;padding:2px 6px;font-weight:600">Eliminado</span>'}</td>
+          <td style="padding:8px;text-align:center">${rivalHtml}</td>
         </tr>`;
       });
-      html+=`</tbody></table></div>`;
+      html+=`</tbody></table>
+        <div style="padding:8px 14px;border-top:0.5px solid rgba(255,255,255,.08)"><span style="font-size:10px;color:rgba(255,255,255,.3)">💡 Se actualiza automáticamente conforme se completan los grupos</span></div>
+      </div>`;
     }
 
     document.getElementById("gruposContent").innerHTML=html;
