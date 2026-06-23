@@ -2526,42 +2526,94 @@ function showCompletedState(){
 }
 
 function calcOpportunities(preds, real) {
-  // Returns opp/acc/exact per phase including groups
   const phases = ['g','r32','oct','qf','sf','final'];
   const totals = {g:72, r32:16, oct:8, qf:4, sf:2, final:1};
   const result = {};
+
+  // Pre-compute user's predicted teams for each KO match
+  const userStandings = getAllStandings(preds);
+  const userBestThirds = getBestThirds(userStandings);
+  const userThirdAssign = assignThirdsToSlots(userBestThirds);
+  const realStandings = getAllStandings(real);
+  const realBestThirds = getBestThirds(realStandings);
+  const realThirdAssign = assignThirdsToSlots(realBestThirds);
+
+  // Resolve a slot to team name using standings + thirds
+  function resolveSlotTeam(slot, standings, thirdAssign, matchId) {
+    if(!slot) return null;
+    if(/^[12][A-L]$/.test(slot)) {
+      const pos = parseInt(slot[0])-1, g = slot[1];
+      const st = standings[g];
+      if(st && st[pos] && st[pos].played > 0) return st[pos].team;
+      return null;
+    }
+    if(slot === '3r' && matchId) return thirdAssign[matchId] || null;
+    return null;
+  }
+
   phases.forEach(ph => {
     const phMatches = allMatches.filter(m => m.phase === ph);
     let opp=0, acc=0, exact=0, available=false;
-    phMatches.forEach(m => {
-      const r = real[m.id];
-      const p = preds[m.id];
-      if(!r) return; // no real result yet
-      available = true;
-      opp++;
-      if(!p) return;
-      // Check winner/draw match
-      const rw = r.h>r.a?'h':r.h<r.a?'a':'d';
-      const pw = p.h>p.a?'h':p.h<p.a?'a':'d';
-      const isKO = ph !== 'g';
-      const rDraw = r.h===r.a;
-      if(rw===pw) {
-        if(isKO && rDraw) {
-          // KO draw: check penalty winner
-          if(r.ph!==undefined && p.ph!==undefined) {
-            const rPW = r.ph>r.pa?'h':'a';
-            const pPW = p.ph>p.pa?'h':'a';
-            if(rPW===pPW) { acc++; }
-          } else { acc++; }
-        } else { acc++; }
-        // Check exact
-        if(p.h===r.h && p.a===r.a) {
-          if(isKO && rDraw) {
-            if(r.ph!==undefined && p.ph!==undefined && p.ph===r.ph && p.pa===r.pa) exact++;
-          } else { exact++; }
+
+    if(ph === 'g') {
+      // Groups: always 72 opportunities
+      opp = 72; available = true;
+      phMatches.forEach(m => {
+        const r = real[m.id], p = preds[m.id];
+        if(!r || !p) return;
+        const rw = r.h>r.a?'h':r.h<r.a?'a':'d';
+        const pw = p.h>p.a?'h':p.h<p.a?'a':'d';
+        if(rw===pw) { acc++; if(p.h===r.h&&p.a===r.a) exact++; }
+      });
+    } else {
+      // KO phases: opp = matches where real teams match user's predicted teams
+      phMatches.forEach(m => {
+        const chain = BRACKET_CHAIN[m.id];
+        if(!chain) return;
+
+        // Get real teams for this match
+        const realH = resolveSlotTeam(chain.h, realStandings, realThirdAssign, m.id);
+        const realA = resolveSlotTeam(chain.a, realStandings, realThirdAssign, m.id);
+        if(!realH || !realA) return; // not yet defined in real
+
+        // Check source groups have at least 1 result
+        const slotsToCheck = [chain.h, chain.a].filter(s => /^[12][A-L]$/.test(s));
+        const groupsHaveResults = slotsToCheck.every(s => {
+          const g = s[1];
+          return (GROUP_MATCHES[g]||[]).some(mid => real[mid] !== undefined);
+        });
+        if(!groupsHaveResults) return;
+
+        available = true;
+
+        // Get user's predicted teams
+        const userH = resolveSlotTeam(chain.h, userStandings, userThirdAssign, m.id);
+        const userA = resolveSlotTeam(chain.a, userStandings, userThirdAssign, m.id);
+        if(!userH || !userA) return;
+
+        // Teams match (order independent)
+        const teamsMatch = (realH===userH && realA===userA) || (realH===userA && realA===userH);
+        if(!teamsMatch) return;
+        opp++;
+
+        // Check acc/exact if real result exists
+        const r = real[m.id], p = preds[m.id];
+        if(!r || !p) return;
+        const rw = r.h>r.a?'h':r.h<r.a?'a':'d';
+        const pw = p.h>p.a?'h':p.h<p.a?'a':'d';
+        const rDraw = r.h===r.a;
+        if(rw===pw) {
+          if(rDraw && r.ph!==undefined && p.ph!==undefined) {
+            if((r.ph>r.pa?'h':'a')===(p.ph>p.pa?'h':'a')) acc++;
+          } else acc++;
+          if(p.h===r.h && p.a===r.a) {
+            if(rDraw && r.ph!==undefined && p.ph!==undefined) {
+              if(p.ph===r.ph && p.pa===r.pa) exact++;
+            } else exact++;
+          }
         }
-      }
-    });
+      });
+    }
     result[ph] = { opp, acc, exact, total: totals[ph], available };
   });
   return result;
@@ -2681,7 +2733,11 @@ window.loadRanking=async function(){
         const userDone=Object.keys(p.preds).filter(id=>allMatches.find(m=>m.id===id&&m.phase===ph)).length;
 
         if(!o||!o.available||o.opp===null){
-          if(userDone===0) return `<span style="text-align:center;font-size:11px;color:var(--light)">—/${phTotal}</span>`;
+          if(ph==='g'){
+            if(userDone===0) return `<span style="text-align:center;font-size:11px;color:var(--light)">—/${phTotal}</span>`;
+          } else {
+            return `<span style="text-align:center;font-size:11px;color:var(--light)">0/${phTotal}</span>`;
+          }
           const pct=Math.round(userDone/phTotal*100);
           return `<span><div class="opp-cell"><div class="opp-val" style="color:${PHASE_COLORS[ph]};opacity:.5">${userDone}/${phTotal}</div><div class="opp-bar-bg"><div class="opp-bar" style="width:${pct}%;background:${PHASE_COLORS[ph]};opacity:.4"></div></div></div></span>`;
         }
@@ -2709,7 +2765,9 @@ window.loadRanking=async function(){
           </tr>`;
         }
         const opp=o.opp!==null?o.opp:userDone;
-        const pct=opp>0?Math.round((o.acc/opp)*100):0;
+        const playedMatches=allMatches.filter(m=>m.phase===ph&&real[m.id]).length;
+        const pctDivisor = ph==='g' ? playedMatches : opp;
+        const pct=pctDivisor>0?Math.round((o.acc/pctDivisor)*100):0;
         const exactos=o.exact||0;
         return `<tr style="border-top:1px solid var(--border)">
           <td style="padding:10px 12px"><div style="display:flex;align-items:center">${dot}${phaseFullLabels[ph]}</div></td>
@@ -3354,18 +3412,13 @@ window.loadGrupos=async function(){
     };
     const dynCol2=(lbl,sp,ms)=>`<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0"><div style="font-size:8px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.3);text-align:center;margin-bottom:3px">${lbl}</div>${sp?`<div style="height:${sp}px"></div>`:''}${ms}</div>`;
     const e=dynMatch2(null,null);
-    // Altura de cada match cell ≈ 44px, gap=4px → cada par = 92px
-    const mH=44, gH=4;
-    const sp1=mH+gH;        // spacer Oct: 1 match height (centrado entre pares)
-    const sp2=sp1*2+mH+gH;  // spacer Cuar
-    const sp3=sp2*2+mH+gH;  // spacer Semi
     const copaHtml=`<div style="background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:16px;padding:18px 10px;margin:4px 0 12px;overflow-x:auto">
       <div style="text-align:center;margin-bottom:12px"><span style="font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,.3)">Progresión al campeonato</span></div>
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:5px;min-width:620px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:5px;min-width:620px">
         ${dynCol2('R32',0,dynMatch2('2A','2B','m73')+dynMatch2('1E','3r','m74')+dynMatch2('1F','2C','m75')+dynMatch2('1C','2F','m76')+dynMatch2('1I','3r','m77')+dynMatch2('2E','2I','m78')+dynMatch2('1A','3r','m79')+dynMatch2('1L','3r','m80'))}
-        ${dynCol2('Oct',sp1,e+e+e+e)}
-        ${dynCol2('Cuar',sp2,e+e)}
-        ${dynCol2('Semi',sp3,e)}
+        ${dynCol2('Oct',12,e+e+e+e)}
+        ${dynCol2('Cuar',28,e+e)}
+        ${dynCol2('Semi',55,e)}
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:5px;padding:0 6px;min-width:80px">
           <div style="font-size:46px;line-height:1;filter:drop-shadow(0 0 12px rgba(212,175,55,.5))">🏆</div>
           <div style="font-size:9px;letter-spacing:2px;color:#d4af37;text-transform:uppercase">Mundial 2026</div>
@@ -3374,9 +3427,9 @@ window.loadGrupos=async function(){
             <div style="font-size:11px;font-weight:500;color:#fff">${champReal2||champion||'—'}</div>
           </div>
         </div>
-        ${dynCol2('Semi',sp3,e)}
-        ${dynCol2('Cuar',sp2,e+e)}
-        ${dynCol2('Oct',sp1,e+e+e+e)}
+        ${dynCol2('Semi',55,e)}
+        ${dynCol2('Cuar',28,e+e)}
+        ${dynCol2('Oct',12,e+e+e+e)}
         ${dynCol2('R32',0,dynMatch2('1D','3r','m81')+dynMatch2('1G','3r','m82')+dynMatch2('2K','2L','m83')+dynMatch2('1H','2J','m84')+dynMatch2('1B','3r','m85')+dynMatch2('1J','2H','m86')+dynMatch2('1K','3r','m87')+dynMatch2('2D','2G','m88'))}
       </div>
       <div style="display:flex;gap:12px;margin-top:10px;padding-top:8px;border-top:0.5px solid rgba(255,255,255,.08);justify-content:center">
