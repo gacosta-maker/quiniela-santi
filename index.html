@@ -457,6 +457,11 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
 .ko-opp-dot{width:7px;height:7px;border-radius:50%;background:#eab308;flex-shrink:0}
 .ko-hit-dot{width:7px;height:7px;border-radius:50%;background:#16a34a;flex-shrink:0}
 .general-match.ko-opp{border-color:rgba(234,179,8,.55)!important;background:rgba(234,179,8,.04)!important}
+.saved-card.ko-void{filter:grayscale(1);opacity:0.5}
+.saved-card.ko-void:hover{transform:none}
+.ko-void-badge{font-size:10px;font-weight:600;padding:3px 9px;border-radius:10px;background:rgba(0,0,0,.06);color:var(--text-muted);border:0.5px solid var(--border);white-space:nowrap;flex-shrink:0}
+.ko-void-strip{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.03);border-top:1px solid var(--border);padding:8px 22px;font-size:12px;font-weight:500;color:var(--text-muted)}
+.general-match.ko-void{filter:grayscale(1);opacity:0.45;pointer-events:none}
 .saved-card.active-card{border-color:var(--blue);background:rgba(26,95,175,.06)}
 .saved-card-teams{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
 .saved-card-team{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:52px}
@@ -2065,7 +2070,7 @@ function renderGeneralView(match){
   if(!match){match=allMatches[currentMatchIdx];}
   const locked=isLocked(currentPhaseFilter);
   const phaseMatches=allMatches.filter(m=>m.phase===currentPhaseFilter);
-  const {oppSet:gOppSet,hitSet:gHitSet}=computeKOOppSet();
+  const {oppSet:gOppSet,hitSet:gHitSet,resolvedSet:gResolvedSet}=computeKOOppSet();
   const items=phaseMatches.map(m=>{
     const mt=getMatchTeams(m,userPredictions);
     const cur=userPredictions[m.id];
@@ -2087,7 +2092,7 @@ function renderGeneralView(match){
       resultIcon='<i class="ti ti-minus" style="font-size:16px;color:var(--muted)"></i>';
       finalScore=`<div style="font-size:10px;color:var(--muted);margin-top:2px">Final: ${realR.h} - ${realR.a}</div>`;
     }
-    const isKOphase=m.phase!=='g';const koOppClass=isKOphase&&gHitSet.has(m.id)?'':(isKOphase&&gOppSet.has(m.id)?' ko-opp':'');
+    const isKOphase=m.phase!=='g';const koOppClass=isKOphase&&gHitSet.has(m.id)?'':(isKOphase&&gOppSet.has(m.id)?' ko-opp':(isKOphase&&gResolvedSet.has(m.id)&&!gOppSet.has(m.id)?' ko-void':''));
     return `<div class="general-match ${matchClass}${koOppClass}" id="gm_${m.id}">
       <div class="gm-result-icon">${resultIcon}</div>
       <div class="gm-team">
@@ -2253,20 +2258,21 @@ window.setView=function(v){
 
 window.jumpTo=function(id){const i=allMatches.findIndex(m=>m.id===id);if(i!==-1){currentMatchIdx=i;currentPhaseFilter=allMatches[i].phase;renderMatch();}};
 
-// Retorna {oppSet, hitSet} para partidos KO donde los equipos predichos coinciden con los reales
+// Retorna {oppSet, hitSet, resolvedSet} para partidos KO
+// resolvedSet = partidos donde los equipos reales ya son determinables
 function computeKOOppSet(){
-  const oppSet=new Set(), hitSet=new Set();
-  if(!Object.keys(realResults).length) return {oppSet,hitSet};
+  const oppSet=new Set(), hitSet=new Set(), resolvedSet=new Set();
+  if(!Object.keys(realResults).length) return {oppSet,hitSet,resolvedSet};
   allMatches.filter(m=>m.phase!=='g').forEach(m=>{
     const uTeams=getMatchTeams(m,userPredictions);
     const rTeams=getMatchTeams(m,realResults);
     if(!uTeams||!rTeams) return;
     const uH=uTeams.home,uA=uTeams.away,rH=rTeams.home,rA=rTeams.away;
     if(!uH||!uA||!rH||!rA||uH==='?'||uA==='?'||rH==='?'||rA==='?') return;
-    const match=((uH===rH&&uA===rA)||(uH===rA&&uA===rH));
-    if(!match) return;
+    resolvedSet.add(m.id);
+    const teamsMatch=((uH===rH&&uA===rA)||(uH===rA&&uA===rH));
+    if(!teamsMatch) return;
     oppSet.add(m.id);
-    // Si hay resultado real, verificar si el usuario acertó el ganador
     const r=realResults[m.id], p=userPredictions[m.id];
     if(r&&p){
       const rw=r.h>r.a?'h':r.h<r.a?'a':'d';
@@ -2274,7 +2280,7 @@ function computeKOOppSet(){
       if(rw===pw) hitSet.add(m.id);
     }
   });
-  return {oppSet,hitSet};
+  return {oppSet,hitSet,resolvedSet};
 }
 
 function renderMatch(){
@@ -2319,8 +2325,9 @@ function renderMatch(){
       const isKO=m.phase!=='g';
       const isHit=isKO&&hitSet.has(m.id);
       const isOpp=isKO&&oppSet.has(m.id)&&!isHit;
-      const oppClass=isHit?' ko-hit':isOpp?' ko-opp':'';
-      const badge=isHit?`<span class="ko-hit-badge">✓ Oportunidad</span>`:isOpp?`<span class="ko-opp-badge">● Oportunidad</span>`:`<div class="saved-card-check">✓</div>`;
+      const isVoid=isKO&&resolvedSet.has(m.id)&&!oppSet.has(m.id);
+      const oppClass=isHit?' ko-hit':isOpp?' ko-opp':isVoid?' ko-void':'';
+      const badge=isHit?`<span class="ko-hit-badge">✓ Oportunidad</span>`:isOpp?`<span class="ko-opp-badge">● Oportunidad</span>`:isVoid?`<span class="ko-void-badge">Sin oportunidad</span>`:'';
       return `<div class="saved-card${oppClass}${isCur?' active-card':''}" onclick="jumpTo('${m.id}')">
         <div class="saved-card-teams">
           <div class="saved-card-team"><div class="saved-card-flag">${flag(mt.home)}</div><div class="saved-card-name">${mt.home}</div></div>
@@ -2402,7 +2409,7 @@ function renderMatch(){
           <div class="match-num" style="color:rgba(255,255,255,.8)">Partido #${match.num} · ${match.date} ${match.time}</div>
         </div>
       </div>
-      ${(()=>{const isKO=match.phase!=='g';if(!isKO)return'';if(hitSet.has(match.id))return`<div class="ko-hit-strip"><div class="ko-hit-dot"></div>Oportunidad — acertaste el ganador</div>`;if(oppSet.has(match.id))return`<div class="ko-opp-strip"><div class="ko-opp-dot"></div>Oportunidad — este partido sí ocurre en el bracket real</div>`;return'';})()}
+      ${(()=>{const isKO=match.phase!=='g';if(!isKO)return'';if(hitSet.has(match.id))return`<div class="ko-hit-strip"><div class="ko-hit-dot"></div>Oportunidad — acertaste el ganador</div>`;if(oppSet.has(match.id))return`<div class="ko-opp-strip"><div class="ko-opp-dot"></div>Oportunidad — este partido sí ocurre en el bracket real</div>`;if(resolvedSet.has(match.id))return`<div class="ko-void-strip">Sin oportunidad — este partido no se dará en el bracket real</div>`;return'';})()}
       <div class="match-card-body">
         <div class="teams-row">
           <div class="team-side"><div class="team-flag">${flag(matchTeams.home)}</div><div class="team-name">${matchTeams.home}</div></div>
