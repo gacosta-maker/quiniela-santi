@@ -448,6 +448,15 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
 .saved-scroll-list::-webkit-scrollbar-thumb{background:var(--blue3);border-radius:2px}
 .saved-card{background:var(--off);border:1px solid var(--border);border-radius:12px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:.2s;gap:10px}
 .saved-card:hover{border-color:var(--blue3);background:rgba(26,95,175,.04);transform:translateX(2px)}
+.saved-card.ko-opp{border-left:3px solid #eab308;padding-left:11px;background:rgba(234,179,8,.05)}
+.saved-card.ko-hit{border-left:3px solid #16a34a;padding-left:11px;background:rgba(22,163,74,.05)}
+.ko-opp-badge{font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:rgba(234,179,8,.18);color:#92400e;border:0.5px solid rgba(234,179,8,.45);white-space:nowrap;flex-shrink:0}
+.ko-hit-badge{font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;background:rgba(22,163,74,.15);color:#15803d;border:0.5px solid rgba(22,163,74,.4);white-space:nowrap;flex-shrink:0}
+.ko-opp-strip{display:flex;align-items:center;gap:8px;background:rgba(234,179,8,.1);border-top:1.5px solid rgba(234,179,8,.3);padding:8px 22px;font-size:12px;font-weight:600;color:#92400e}
+.ko-hit-strip{display:flex;align-items:center;gap:8px;background:rgba(22,163,74,.1);border-top:1.5px solid rgba(22,163,74,.3);padding:8px 22px;font-size:12px;font-weight:600;color:#15803d}
+.ko-opp-dot{width:7px;height:7px;border-radius:50%;background:#eab308;flex-shrink:0}
+.ko-hit-dot{width:7px;height:7px;border-radius:50%;background:#16a34a;flex-shrink:0}
+.general-match.ko-opp{border-color:rgba(234,179,8,.55)!important;background:rgba(234,179,8,.04)!important}
 .saved-card.active-card{border-color:var(--blue);background:rgba(26,95,175,.06)}
 .saved-card-teams{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
 .saved-card-team{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:52px}
@@ -2056,6 +2065,7 @@ function renderGeneralView(match){
   if(!match){match=allMatches[currentMatchIdx];}
   const locked=isLocked(currentPhaseFilter);
   const phaseMatches=allMatches.filter(m=>m.phase===currentPhaseFilter);
+  const {oppSet:gOppSet,hitSet:gHitSet}=computeKOOppSet();
   const items=phaseMatches.map(m=>{
     const mt=getMatchTeams(m,userPredictions);
     const cur=userPredictions[m.id];
@@ -2077,7 +2087,8 @@ function renderGeneralView(match){
       resultIcon='<i class="ti ti-minus" style="font-size:16px;color:var(--muted)"></i>';
       finalScore=`<div style="font-size:10px;color:var(--muted);margin-top:2px">Final: ${realR.h} - ${realR.a}</div>`;
     }
-    return `<div class="general-match ${matchClass}" id="gm_${m.id}">
+    const isKOphase=m.phase!=='g';const koOppClass=isKOphase&&gHitSet.has(m.id)?'':(isKOphase&&gOppSet.has(m.id)?' ko-opp':'');
+    return `<div class="general-match ${matchClass}${koOppClass}" id="gm_${m.id}">
       <div class="gm-result-icon">${resultIcon}</div>
       <div class="gm-team">
         <div class="gm-flag">${flag(mt.home)}</div>
@@ -2242,6 +2253,30 @@ window.setView=function(v){
 
 window.jumpTo=function(id){const i=allMatches.findIndex(m=>m.id===id);if(i!==-1){currentMatchIdx=i;currentPhaseFilter=allMatches[i].phase;renderMatch();}};
 
+// Retorna {oppSet, hitSet} para partidos KO donde los equipos predichos coinciden con los reales
+function computeKOOppSet(){
+  const oppSet=new Set(), hitSet=new Set();
+  if(!Object.keys(realResults).length) return {oppSet,hitSet};
+  allMatches.filter(m=>m.phase!=='g').forEach(m=>{
+    const uTeams=getMatchTeams(m,userPredictions);
+    const rTeams=getMatchTeams(m,realResults);
+    if(!uTeams||!rTeams) return;
+    const uH=uTeams.home,uA=uTeams.away,rH=rTeams.home,rA=rTeams.away;
+    if(!uH||!uA||!rH||!rA||uH==='?'||uA==='?'||rH==='?'||rA==='?') return;
+    const match=((uH===rH&&uA===rA)||(uH===rA&&uA===rH));
+    if(!match) return;
+    oppSet.add(m.id);
+    // Si hay resultado real, verificar si el usuario acertó el ganador
+    const r=realResults[m.id], p=userPredictions[m.id];
+    if(r&&p){
+      const rw=r.h>r.a?'h':r.h<r.a?'a':'d';
+      const pw=p.h>p.a?'h':p.h<p.a?'a':'d';
+      if(rw===pw) hitSet.add(m.id);
+    }
+  });
+  return {oppSet,hitSet};
+}
+
 function renderMatch(){
   const match=allMatches[currentMatchIdx];
   const predicted=Object.keys(userPredictions).length;
@@ -2250,6 +2285,7 @@ function renderMatch(){
   const cur=userPredictions[match.id];
   const locked=isLocked(match.phase);
   const matchTeams=getMatchTeams(match, userPredictions);
+  const {oppSet,hitSet}=computeKOOppSet();
 
   const phaseConfig={
     g:{bg:'linear-gradient(135deg,#1a5faf 0%,#0d3a6e 100%)',badge:'rgba(255,255,255,.15)',label:'Fase de Grupos'},
@@ -2280,12 +2316,17 @@ function renderMatch(){
     const items=savedMatches.map(m=>{
       const sc=userPredictions[m.id],isCur=m.id===match.id;
       const mt=getMatchTeams(m, userPredictions);
-      return `<div class="saved-card${isCur?' active-card':''}" onclick="jumpTo('${m.id}')">
+      const isKO=m.phase!=='g';
+      const isHit=isKO&&hitSet.has(m.id);
+      const isOpp=isKO&&oppSet.has(m.id)&&!isHit;
+      const oppClass=isHit?' ko-hit':isOpp?' ko-opp':'';
+      const badge=isHit?`<span class="ko-hit-badge">✓ Oportunidad</span>`:isOpp?`<span class="ko-opp-badge">● Oportunidad</span>`:`<div class="saved-card-check">✓</div>`;
+      return `<div class="saved-card${oppClass}${isCur?' active-card':''}" onclick="jumpTo('${m.id}')">
         <div class="saved-card-teams">
           <div class="saved-card-team"><div class="saved-card-flag">${flag(mt.home)}</div><div class="saved-card-name">${mt.home}</div></div>
           <div class="saved-card-vs"><div class="saved-card-score">${sc.h} - ${sc.a}</div><div class="saved-card-date">${m.date}</div></div>
           <div class="saved-card-team"><div class="saved-card-flag">${flag(mt.away)}</div><div class="saved-card-name">${mt.away}</div></div>
-        </div><div class="saved-card-check">✓</div>
+        </div>${badge}
       </div>`;
     }).join('');
     scrollHtml=`<div class="saved-scroll-wrap">
@@ -2361,6 +2402,7 @@ function renderMatch(){
           <div class="match-num" style="color:rgba(255,255,255,.8)">Partido #${match.num} · ${match.date} ${match.time}</div>
         </div>
       </div>
+      ${(()=>{const isKO=match.phase!=='g';if(!isKO)return'';if(hitSet.has(match.id))return`<div class="ko-hit-strip"><div class="ko-hit-dot"></div>Oportunidad — acertaste el ganador</div>`;if(oppSet.has(match.id))return`<div class="ko-opp-strip"><div class="ko-opp-dot"></div>Oportunidad — este partido sí ocurre en el bracket real</div>`;return'';})()}
       <div class="match-card-body">
         <div class="teams-row">
           <div class="team-side"><div class="team-flag">${flag(matchTeams.home)}</div><div class="team-name">${matchTeams.home}</div></div>
@@ -2646,10 +2688,30 @@ function calcOpportunities(preds, real) {
 
 function calcScore(preds,real){
   let pts=0,winner=0,exact=0;
+
+  // Pre-computar emparejamientos KO donde los equipos predichos coinciden con los reales
+  const koTeamMatch=new Set();
+  const uSt=getAllStandings(preds),uBT=getBestThirds(uSt),uTA=assignThirdsToSlots(uBT);
+  const rSt=getAllStandings(real),rBT=getBestThirds(rSt),rTA=assignThirdsToSlots(rBT);
+  function rSlot(slot,st,ta,mid){
+    if(!slot)return null;
+    if(/^[12][A-L]$/.test(slot)){const pos=parseInt(slot[0])-1,g=slot[1];const s=st[g];return s&&s[pos]&&s[pos].played>0?s[pos].team:null;}
+    return slot==='3r'&&mid?ta[mid]||null:null;
+  }
+  allMatches.filter(m=>m.phase!=='g').forEach(m=>{
+    const chain=BRACKET_CHAIN[m.id];if(!chain)return;
+    const rH=rSlot(chain.h,rSt,rTA,m.id),rA=rSlot(chain.a,rSt,rTA,m.id);
+    const uH=rSlot(chain.h,uSt,uTA,m.id),uA=rSlot(chain.a,uSt,uTA,m.id);
+    if(!rH||!rA||!uH||!uA)return;
+    if((rH===uH&&rA===uA)||(rH===uA&&rA===uH))koTeamMatch.add(m.id);
+  });
+
   Object.entries(real).forEach(([mid,r])=>{
     const p=preds[mid];if(!p)return;
     const match=allMatches.find(m=>m.id===mid);
     const isKO=match&&match.phase!=='g';
+    // Fases KO: solo puntuar si los equipos predichos coinciden con los reales
+    if(isKO&&!koTeamMatch.has(mid))return;
     const rDraw=r.h===r.a;
     const pDraw=p.h===p.a;
     const rw=r.h>r.a?'h':r.h<r.a?'a':'d';
