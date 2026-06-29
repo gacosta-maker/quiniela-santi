@@ -2291,7 +2291,7 @@ function renderMatch(){
   const cur=userPredictions[match.id];
   const locked=isLocked(match.phase);
   const matchTeams=getMatchTeams(match, userPredictions);
-  const {oppSet,hitSet}=computeKOOppSet();
+  const {oppSet,hitSet,resolvedSet}=computeKOOppSet();
 
   const phaseConfig={
     g:{bg:'linear-gradient(135deg,#1a5faf 0%,#0d3a6e 100%)',badge:'rgba(255,255,255,.15)',label:'Fase de Grupos'},
@@ -3726,4 +3726,4 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 </script>
 </body>
-</html>
+</html>  
