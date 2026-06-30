@@ -3380,12 +3380,19 @@ async function renderAdminPanel(){
       }
       const homeFlag=flag(homeName);
       const awayFlag=flag(awayName);
+      const isKOmatch=m.phase!=='g';
+      const isDrawNow=s!==undefined&&s.h===s.a;
       html+=`<div class="result-row">
         <div class="result-team">${homeFlag} ${homeName}</div>
-        <input class="result-input${s?' set':''}" id="rh_${m.id}" type="number" min="0" max="20" placeholder="-" value="${s!==undefined?s.h:''}">
+        <input class="result-input${s?' set':''}" id="rh_${m.id}" type="number" min="0" max="20" placeholder="-" value="${s!==undefined?s.h:''}" ${isKOmatch?`onchange="adminCheckPenalty('${m.id}')"`:''}>
         <div class="result-vs">:</div>
-        <input class="result-input${s?' set':''}" id="ra_${m.id}" type="number" min="0" max="20" placeholder="-" value="${s!==undefined?s.a:''}">
+        <input class="result-input${s?' set':''}" id="ra_${m.id}" type="number" min="0" max="20" placeholder="-" value="${s!==undefined?s.a:''}" ${isKOmatch?`onchange="adminCheckPenalty('${m.id}')"`:''}>
         <div class="result-team right">${awayName} ${awayFlag}</div>
+        ${isKOmatch?`<div class="gm-penalty-wrap" id="apw_${m.id}" style="${isDrawNow?'display:flex':'display:none'};grid-column:1/-1;margin-top:6px">
+          <input class="gm-pen-input" id="rph_${m.id}" type="number" min="0" max="20" placeholder="–" value="${s&&s.ph!==undefined?s.ph:''}">
+          <span style="font-size:11px;color:var(--orange);font-weight:700">PEN</span>
+          <input class="gm-pen-input" id="rpa_${m.id}" type="number" min="0" max="20" placeholder="–" value="${s&&s.pa!==undefined?s.pa:''}">
+        </div>`:''}
       </div>`;
     });
     html+='</div></div>';
