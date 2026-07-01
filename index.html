@@ -462,6 +462,9 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
 .ko-void-badge{font-size:10px;font-weight:600;padding:3px 9px;border-radius:10px;background:rgba(0,0,0,.06);color:var(--text-muted);border:0.5px solid var(--border);white-space:nowrap;flex-shrink:0}
 .ko-void-strip{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.03);border-top:1px solid var(--border);padding:8px 22px;font-size:12px;font-weight:500;color:var(--text-muted)}
 .general-match.ko-void{filter:grayscale(1);opacity:0.45;pointer-events:none}
+.winner-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#92400e,#b45309);color:#fef3c7;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;border:1px solid rgba(234,179,8,.4)}
+@keyframes winnerPulse{0%,100%{opacity:1}50%{opacity:.7}}
+.winner-badge{animation:winnerPulse 2s ease-in-out infinite}
 .saved-card.active-card{border-color:var(--blue);background:rgba(26,95,175,.06)}
 .saved-card-teams{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
 .saved-card-team{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:52px}
@@ -616,7 +619,12 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
       <div class="rank-hero-sub">Actualizado con cada resultado real del torneo</div>
       <button class="refresh-btn" onclick="loadRanking()">↻ Actualizar</button>
     </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px" id="rankViewTabs">
+      <button class="view-btn active" id="rankTabTable" onclick="switchRankView('table')">🏆 Tabla</button>
+      <button class="view-btn" id="rankTabEvol" onclick="switchRankView('evolucion')">📈 Evolución</button>
+    </div>
     <div id="rankingContent"><div class="loading"><div class="spinner"></div><span>Calculando ranking...</span></div></div>
+    <div id="rankingEvolucion" style="display:none;padding-bottom:24px"></div>
   </div>
 </div>
 
@@ -2632,63 +2640,48 @@ function calcOpportunities(preds, real) {
     if(ph === 'g') {
       // Groups: always 72 opportunities
       opp = 72; available = true;
+      let played = 0;
       phMatches.forEach(m => {
         const r = real[m.id], p = preds[m.id];
         if(!r || !p) return;
+        played++;
         const rw = r.h>r.a?'h':r.h<r.a?'a':'d';
         const pw = p.h>p.a?'h':p.h<p.a?'a':'d';
         if(rw===pw) { acc++; if(p.h===r.h&&p.a===r.a) exact++; }
       });
+      result[ph] = { opp, acc, exact, total: totals[ph], available, played };
     } else {
-      // KO phases: opp = matches where real teams match user's predicted teams
+      // KO phases: use getMatchTeams for full recursive resolution (handles Wm{id} slots)
+      let played = 0;
       phMatches.forEach(m => {
-        const chain = BRACKET_CHAIN[m.id];
-        if(!chain) return;
-
-        // Get real teams for this match
-        const realH = resolveSlotTeam(chain.h, realStandings, realThirdAssign, m.id);
-        const realA = resolveSlotTeam(chain.a, realStandings, realThirdAssign, m.id);
-        if(!realH || !realA) return; // not yet defined in real
-
-        // Check source groups have at least 1 result
-        const slotsToCheck = [chain.h, chain.a].filter(s => /^[12][A-L]$/.test(s));
-        const groupsHaveResults = slotsToCheck.every(s => {
-          const g = s[1];
-          return (GROUP_MATCHES[g]||[]).some(mid => real[mid] !== undefined);
-        });
-        if(!groupsHaveResults) return;
-
+        const rTeams = getMatchTeams(m, real);
+        const uTeams = getMatchTeams(m, preds);
+        if(!rTeams||!uTeams) return;
+        const rH=rTeams.home,rA=rTeams.away,uH=uTeams.home,uA=uTeams.away;
+        if(!rH||!rA||!uH||!uA||rH==='?'||rA==='?'||uH==='?'||uA==='?') return;
         available = true;
-
-        // Get user's predicted teams
-        const userH = resolveSlotTeam(chain.h, userStandings, userThirdAssign, m.id);
-        const userA = resolveSlotTeam(chain.a, userStandings, userThirdAssign, m.id);
-        if(!userH || !userA) return;
-
-        // Teams match (order independent)
-        const teamsMatch = (realH===userH && realA===userA) || (realH===userA && realA===userH);
+        const teamsMatch=(rH===uH&&rA===uA)||(rH===uA&&rA===uH);
         if(!teamsMatch) return;
         opp++;
-
-        // Check acc/exact if real result exists
-        const r = real[m.id], p = preds[m.id];
-        if(!r || !p) return;
-        const rw = r.h>r.a?'h':r.h<r.a?'a':'d';
-        const pw = p.h>p.a?'h':p.h<p.a?'a':'d';
-        const rDraw = r.h===r.a;
-        if(rw===pw) {
-          if(rDraw && r.ph!==undefined && p.ph!==undefined) {
-            if((r.ph>r.pa?'h':'a')===(p.ph>p.pa?'h':'a')) acc++;
+        const r=real[m.id],p=preds[m.id];
+        if(r) played++;
+        if(!r||!p) return;
+        const rw=r.h>r.a?'h':r.h<r.a?'a':'d';
+        const pw=p.h>p.a?'h':p.h<p.a?'a':'d';
+        const rDraw=r.h===r.a;
+        if(rw===pw){
+          if(rDraw&&r.ph!==undefined&&p.ph!==undefined){
+            if((r.ph>r.pa?'h':'a')===(p.ph>p.pa?'h':'a'))acc++;
           } else acc++;
-          if(p.h===r.h && p.a===r.a) {
-            if(rDraw && r.ph!==undefined && p.ph!==undefined) {
-              if(p.ph===r.ph && p.pa===r.pa) exact++;
+          if(p.h===r.h&&p.a===r.a){
+            if(rDraw&&r.ph!==undefined&&p.ph!==undefined){
+              if(p.ph===r.ph&&p.pa===r.pa)exact++;
             } else exact++;
           }
         }
       });
+      result[ph] = { opp, acc, exact, total: totals[ph], available, played };
     }
-    result[ph] = { opp, acc, exact, total: totals[ph], available };
   });
   return result;
 }
@@ -2777,6 +2770,12 @@ window.loadRanking=async function(){
       players.push({uid:d.id,name:data.nombre||data.email,email:data.email,foto:data.foto||'',pts,exact,winner,opps,preds:data.predicciones||{},paid});
     });
     players.sort((a,b)=>b.pts-a.pts||b.exact-a.exact||b.winner-a.winner);
+    // Determine mathematical winner: leader's gap > remaining matches
+    const totalMatches=104;
+    const playedMatches=realCount;
+    const remaining=totalMatches-playedMatches;
+    const leader=players[0],second=players[1];
+    const isConfirmedWinner=players.length>=2&&leader&&second&&(leader.pts-second.pts)>remaining;
 
     if(!players.length){
       document.getElementById("rankingContent").innerHTML='<div class="empty-state"><div class="empty-icon">🤔</div>Aún no hay participantes.</div>';
@@ -2856,6 +2855,8 @@ window.loadRanking=async function(){
             <td style="padding:10px 12px;text-align:center;color:var(--muted)">—</td>
             <td style="padding:10px 12px;text-align:center;color:var(--muted)">—</td>
             <td style="padding:10px 12px;text-align:center;color:var(--muted)">—</td>
+            <td style="padding:10px 12px;text-align:center;color:var(--muted)">—</td>
+            <td style="padding:10px 12px;text-align:center;color:var(--muted)">—</td>
           </tr>`;
         }
         const opp=o.opp!==null?o.opp:userDone;
@@ -2867,6 +2868,8 @@ window.loadRanking=async function(){
           <td style="padding:10px 12px"><div style="display:flex;align-items:center">${dot}${phaseFullLabels[ph]}</div></td>
           <td style="padding:10px 12px;text-align:center;font-weight:700;color:${PHASE_COLORS[ph]}">${opp}/${phTotal}</td>
           <td style="padding:10px 12px;text-align:center;font-weight:700;color:${o.acc>0?'var(--green)':'var(--muted)'}">${o.acc>0?o.acc:'—'}</td>
+          <td style="padding:10px 12px;text-align:center;font-weight:700;color:${(o.played||0)-o.acc>0?'#b91c1c':'var(--muted)'}">${(o.played||0)-o.acc>0?(o.played||0)-o.acc:'—'}</td>
+          <td style="padding:10px 12px;text-align:center;font-weight:700;color:${opp-(o.played||0)>0?'#0ea5e9':'var(--muted)'}">${opp-(o.played||0)>0?opp-(o.played||0):'—'}</td>
           <td style="padding:10px 12px;text-align:center;font-weight:800;color:${exactos>0?'#92400e':'var(--light)'}">${exactos>0?'⭐ '+exactos:'—'}</td>
           <td style="padding:10px 12px;text-align:center">
             ${opp>0?`<div style="display:flex;flex-direction:column;align-items:center;gap:3px">
@@ -2879,12 +2882,13 @@ window.loadRanking=async function(){
         </tr>`;
       }).join('');
 
+      const isWinner=isConfirmedWinner&&i===0;
       rankHtml+=`<div class="rank-row${p.email===myEmail?' me':''}" onclick="toggleDetail('detail_${i}')">
         <span class="rank-pos${i<3?' top':''}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</span>
         <span class="rank-player">
           ${p.foto?`<img class="rank-avatar" src="${p.foto}" alt="">`:''} 
           ${p.name}${p.email===myEmail?' 👤':''}
-
+          ${isWinner?'<span class="winner-badge">★ WINNER</span>':''}
         </span>
         <span class="rank-pts" onclick="event.stopPropagation();openPopByIdx(${i})" 
           style="cursor:pointer;border-radius:8px;padding:4px;transition:.2s"
@@ -2902,6 +2906,8 @@ window.loadRanking=async function(){
               <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Fase</th>
               <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Oportunidades</th>
               <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Acertados</th>
+              <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;color:#b91c1c;text-transform:uppercase;letter-spacing:1px">Fallados</th>
+              <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Pendientes</th>
               <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:1px">⭐ Exactos</th>
               <th style="padding:8px 12px;text-align:center;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px">% Éxito</th>
             </tr>
@@ -2919,6 +2925,125 @@ window.loadRanking=async function(){
     console.error(e);
     document.getElementById("rankingContent").innerHTML='<div class="empty-state">Error al cargar el ranking.</div>';
   }
+};
+
+
+window.switchRankView=function(view){
+  document.getElementById('rankTabTable').classList.toggle('active',view==='table');
+  document.getElementById('rankTabEvol').classList.toggle('active',view==='evolucion');
+  document.getElementById('rankingContent').style.display=view==='table'?'':'none';
+  const evo=document.getElementById('rankingEvolucion');
+  evo.style.display=view==='evolucion'?'':'none';
+  if(view==='evolucion'&&!evo._rendered){renderEvolucion();evo._rendered=true;}
+};
+
+window.renderEvolucion=function(){
+  const players=window._rankPlayers;
+  const real=window._rankReal||{};
+  const el=document.getElementById('rankingEvolucion');
+  if(!players||!players.length){el.innerHTML='<div class="empty-state">Carga el ranking primero.</div>';return;}
+
+  // Build checkpoints: sorted matches in chronological order grouped by phase blocks
+  const phaseOrder=['g','r32','oct','qf','sf','final'];
+  const phaseLabels={g:'Grupos',r32:'R32',oct:'Octavos',qf:'Cuartos',sf:'Semi',final:'Final'};
+  const phaseColors={g:'#16a34a',r32:'#0ea5e9',oct:'#8b5cf6',qf:'#f59e0b',sf:'#ec4899',final:'#eab308'};
+
+  // Create checkpoints: one per phase (cumulative)
+  const checkpoints=[{label:'Inicio',pts:players.map(()=>0)}];
+  phaseOrder.forEach(ph=>{
+    const phMatches=allMatches.filter(m=>m.phase===ph&&real[m.id]);
+    if(!phMatches.length)return;
+    // Compute cumulative pts up to and including this phase
+    const subsetsPlayed=allMatches.filter(m=>phaseOrder.indexOf(m.phase)<=phaseOrder.indexOf(ph)&&real[m.id]);
+    const subReal={};
+    subsetsPlayed.forEach(m=>{subReal[m.id]=real[m.id];});
+    const pts=players.map(p=>{
+      if(!p.paid)return 0;
+      return calcScore(p.preds,subReal).pts;
+    });
+    checkpoints.push({label:phaseLabels[ph],pts,color:phaseColors[ph]});
+  });
+
+  const N=players.length;
+  const labels=checkpoints.map(c=>c.label);
+  // Convert pts to rank positions at each checkpoint (1=best, N=worst)
+  const rankData=players.map((_,pi)=>checkpoints.map((cp,ci)=>{
+    if(ci===0) return 0;
+    const myPts=cp.pts[pi];
+    const rank=cp.pts.filter(x=>x>myPts).length+1;
+    return N+1-rank; // invert: higher Y = better
+  }));
+
+  const COLORS=['#2a78d6','#1baf7a','#eda100','#e34948','#4a3aa7','#e87ba4','#eb6834','#008300','#D4AF37','#888'];
+  const DASHES=[[],[6,3],[2,3],[8,3,2,3],[4,2],[6,2,2,2]];
+
+  const cid='evolCanvas_'+Date.now();
+  el.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:8px 16px;margin-bottom:16px" id="evolLegend"></div><div style="position:relative;width:100%;height:340px"><canvas id="${cid}" role="img" aria-label="Evolución del ranking por fase">Gráfica de posiciones.</canvas></div>`;
+
+  const legend=document.getElementById('evolLegend');
+  players.forEach((p,i)=>{
+    const d=document.createElement('div');
+    d.style.cssText='display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary)';
+    d.innerHTML=`<div style="width:10px;height:10px;border-radius:50%;background:${COLORS[i%COLORS.length]};flex-shrink:0"></div><span>${p.name}</span>`;
+    legend.appendChild(d);
+  });
+
+  if(typeof Chart==='undefined'){
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js';
+    s.onload=()=>_drawEvolChart(cid,labels,rankData,players,N,COLORS,DASHES);
+    document.head.appendChild(s);
+  } else {
+    _drawEvolChart(cid,labels,rankData,players,N,COLORS,DASHES);
+  }
+};
+
+window._drawEvolChart=function(cid,labels,rankData,players,N,COLORS,DASHES){
+  const isDark=window.matchMedia('(prefers-color-scheme:dark)').matches;
+  const gc=isDark?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.06)';
+  const tc=isDark?'#898781':'#898781';
+  new Chart(document.getElementById(cid),{
+    type:'line',
+    data:{labels,datasets:players.map((p,i)=>({
+      label:p.name,
+      data:rankData[i],
+      borderColor:COLORS[i%COLORS.length],
+      borderWidth:2.5,
+      borderDash:DASHES[i%DASHES.length],
+      pointBackgroundColor:COLORS[i%COLORS.length],
+      pointBorderColor:isDark?'#1a1a19':'#ffffff',
+      pointBorderWidth:2,
+      pointRadius:(ctx)=>ctx.dataIndex===0?7:4,
+      pointHoverRadius:7,
+      tension:0.25,fill:false
+    }))},
+    options:{responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{
+          title:items=>items[0].label,
+          label:item=>{
+            const y=item.raw;
+            if(y===0)return item.dataset.label+': Inicio (empatados)';
+            const rank=N+1-y;
+            return item.dataset.label+': #'+rank;
+          }
+        },itemSort:(a,b)=>b.raw-a.raw}
+      },
+      scales:{
+        x:{grid:{color:gc,lineWidth:0.5},ticks:{color:tc,font:{size:11},maxRotation:0},border:{display:false}},
+        y:{reverse:false,min:-0.3,max:N+0.5,
+          ticks:{color:tc,font:{size:11},stepSize:1,callback:v=>{
+            if(v===0)return 'Inicio';
+            const r=N+1-v;
+            return Number.isInteger(v)&&v>0&&r>=1&&r<=N?'#'+r:'';
+          }},
+          grid:{color:gc,lineWidth:0.5},border:{display:false}
+        }
+      }
+    }
+  });
 };
 
 window.toggleDetail=function(id){
@@ -3014,6 +3139,18 @@ window.showPlayerQuiniela=function(uid){
   });
 
   const preds=player.preds;
+  // Compute admin opp/void sets for this player
+  const adminOppSet=new Set(),adminResolvedSet=new Set();
+  if(Object.keys(realResults).length){
+    allMatches.filter(m=>m.phase!=='g').forEach(m=>{
+      const rT=getMatchTeams(m,realResults),uT=getMatchTeams(m,preds);
+      if(!rT||!uT)return;
+      const rH=rT.home,rA=rT.away,uH=uT.home,uA=uT.away;
+      if(!rH||!rA||!uH||!uA||rH==='?'||rA==='?'||uH==='?'||uA==='?')return;
+      adminResolvedSet.add(m.id);
+      if((rH===uH&&rA===uA)||(rH===uA&&rA===uH))adminOppSet.add(m.id);
+    });
+  }
   const phases=['g','r32','oct','qf','sf','3rd','final'];
   const phaseNames={g:'Fase de Grupos',r32:'Ronda de 32',oct:'Octavos',qf:'Cuartos',sf:'Semifinal','3rd':'3er Lugar',final:'Final'};
   const phaseColors={g:'var(--blue)',r32:'#0ea5e9',oct:'#8b5cf6',qf:'#f59e0b',sf:'#ec4899','3rd':'#f97316',final:'#eab308'};
@@ -3065,12 +3202,16 @@ window.showPlayerQuiniela=function(uid){
       const fH=flag(home);
       const fA=flag(away);
       const hasPred=pred!==undefined;
-      const bg=hasPred?'var(--white)':'rgba(220,38,38,.04)';
-      const border=hasPred?'var(--border)':'rgba(220,38,38,.2)';
+      const isKOm=m.phase!=='g';
+      const isOppM=isKOm&&adminOppSet.has(m.id);
+      const isVoidM=isKOm&&adminResolvedSet.has(m.id)&&!adminOppSet.has(m.id);
+      const bg=hasPred?(isOppM?'rgba(234,179,8,.07)':isVoidM?'var(--off)':'var(--white)'):'rgba(220,38,38,.04)';
+      const border=hasPred?(isOppM?'rgba(234,179,8,.5)':isVoidM?'var(--border)':'var(--border)'):'rgba(220,38,38,.2)';
+      const cardFilter=isVoidM?'filter:grayscale(1);opacity:0.45;':'';
       const scoreH=hasPred?pred.h:'–';
       const scoreA=hasPred?pred.a:'–';
 
-      matchesHtml+=`<div style="background:${bg};border:1px solid ${border};border-radius:10px;padding:10px 14px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px">
+      matchesHtml+=`<div style="background:${bg};border:1px solid ${border};border-radius:10px;padding:10px 14px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;${cardFilter}">
         <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
           <span style="font-size:13px;font-weight:600;color:var(--text)">${home}</span>
           <div>${fH}</div>
@@ -3560,6 +3701,28 @@ window.loadGrupos=async function(){
             <div style="font-size:7px;letter-spacing:1.5px;text-transform:uppercase;color:#d4af37;margin-bottom:2px">Campeón</div>
             <div style="font-size:11px;font-weight:500;color:#fff">${champReal2||champion||'—'}</div>
           </div>
+          ${(()=>{
+            const f1=resolveRealSlot('Wm101',rs2,'m104');
+            const f2=resolveRealSlot('Wm102',rs2,'m104');
+            if(!f1&&!f2) return '';
+            const finalPlayed=real&&real['m104'];
+            const f1name=f1?f1.team:'?';
+            const f2name=f2?f2.team:'?';
+            const f1isWinner=champReal2&&f1name===champReal2;
+            const f2isWinner=champReal2&&f2name===champReal2;
+            const f1gray=finalPlayed&&!f1isWinner?'filter:grayscale(1);opacity:0.55':'';
+            const f2gray=finalPlayed&&!f2isWinner?'filter:grayscale(1);opacity:0.55':'';
+            return '<div style="display:flex;align-items:center;gap:6px;margin-top:4px">'
+              +'<div style="text-align:center;'+f1gray+'">'
+              +'<div style="font-size:16px">'+flag(f1name)+'</div>'
+              +'<div style="font-size:8px;color:rgba(255,255,255,.55);max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+f1name+'</div>'
+              +'</div>'
+              +'<div style="font-size:8px;color:rgba(255,255,255,.3)">vs</div>'
+              +'<div style="text-align:center;'+f2gray+'">'
+              +'<div style="font-size:16px">'+flag(f2name)+'</div>'
+              +'<div style="font-size:8px;color:rgba(255,255,255,.55);max-width:40px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+f2name+'</div>'
+              +'</div>';
+          })()}
         </div>
         ${dynCol2('Semi',55,dynMatch2('Wm99','Wm100','m102'))}
         ${dynCol2('Cuar',28,dynMatch2('Wm93','Wm94','m98')+dynMatch2('Wm95','Wm96','m100'))}
