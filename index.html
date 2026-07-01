@@ -2943,25 +2943,25 @@ window.renderEvolucion=function(){
   const el=document.getElementById('rankingEvolucion');
   if(!players||!players.length){el.innerHTML='<div class="empty-state">Carga el ranking primero.</div>';return;}
 
-  // Build checkpoints: sorted matches in chronological order grouped by phase blocks
-  const phaseOrder=['g','r32','oct','qf','sf','final'];
-  const phaseLabels={g:'Grupos',r32:'R32',oct:'Octavos',qf:'Cuartos',sf:'Semi',final:'Final'};
-  const phaseColors={g:'#16a34a',r32:'#0ea5e9',oct:'#8b5cf6',qf:'#f59e0b',sf:'#ec4899',final:'#eab308'};
+  // Build checkpoints by date — one per unique match date that has real results
+  const playedMatches=allMatches.filter(m=>real[m.id]);
+  if(!playedMatches.length){el.innerHTML='<div style="padding:24px;text-align:center;color:var(--text-muted)">Aún no hay resultados reales para mostrar.</div>';return;}
 
-  // Create checkpoints: one per phase (cumulative)
-  const checkpoints=[{label:'Inicio',pts:players.map(()=>0)}];
-  phaseOrder.forEach(ph=>{
-    const phMatches=allMatches.filter(m=>m.phase===ph&&real[m.id]);
-    if(!phMatches.length)return;
-    // Compute cumulative pts up to and including this phase
-    const subsetsPlayed=allMatches.filter(m=>phaseOrder.indexOf(m.phase)<=phaseOrder.indexOf(ph)&&real[m.id]);
+  // Get unique dates in order
+  const datesSet=new Set(playedMatches.map(m=>m.date));
+  const dates=['Inicio',...Array.from(datesSet).sort()];
+
+  // For each date checkpoint, compute cumulative real results up to that date
+  const checkpoints=dates.map(d=>{
+    if(d==='Inicio')return{label:'Inicio',pts:players.map(()=>0)};
     const subReal={};
-    subsetsPlayed.forEach(m=>{subReal[m.id]=real[m.id];});
-    const pts=players.map(p=>{
-      if(!p.paid)return 0;
-      return calcScore(p.preds,subReal).pts;
-    });
-    checkpoints.push({label:phaseLabels[ph],pts,color:phaseColors[ph]});
+    playedMatches.filter(m=>m.date<=d).forEach(m=>{subReal[m.id]=real[m.id];});
+    const pts=players.map(p=>p.paid?calcScore(p.preds,subReal).pts:0);
+    // Format date label: Jun 12 → "12 Jun"
+    const parts=d.split('-');
+    const months=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const label=parts.length===3?`${parseInt(parts[2])} ${months[parseInt(parts[1])]}`:d;
+    return{label,pts};
   });
 
   const N=players.length;
@@ -2978,7 +2978,8 @@ window.renderEvolucion=function(){
   const DASHES=[[],[6,3],[2,3],[8,3,2,3],[4,2],[6,2,2,2]];
 
   const cid='evolCanvas_'+Date.now();
-  el.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:8px 16px;margin-bottom:16px" id="evolLegend"></div><div style="position:relative;width:100%;height:340px"><canvas id="${cid}" role="img" aria-label="Evolución del ranking por fase">Gráfica de posiciones.</canvas></div>`;
+  const chartWidth=Math.max(680,checkpoints.length*38);
+  el.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:8px 16px;margin-bottom:16px" id="evolLegend"></div><div style="overflow-x:auto;width:100%"><div style="position:relative;width:${chartWidth}px;height:340px"><canvas id="${cid}" role="img" aria-label="Evolución del ranking por día">Gráfica de posiciones.</canvas></div></div>`;
 
   const legend=document.getElementById('evolLegend');
   players.forEach((p,i)=>{
@@ -3675,15 +3676,17 @@ window.loadGrupos=async function(){
       const winner=resolveRealSlot(winSlot,rs2,fm.id);
       return winner?winner.team:'';
     })();
-    const mkTeam2=(r,slot)=>{
-      if(r){const fl=flag(r.team);const bg=r.isLeader?'background:rgba(22,163,74,.18);':r.isThird?'background:rgba(234,179,8,.12);':'';return `<div style="padding:4px 6px;display:flex;align-items:center;gap:5px;${bg}overflow:hidden"><div style="flex-shrink:0">${fl}</div><span style="font-size:9px;font-weight:500;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.team}</span></div>`;}
+    const mkTeam2=(r,slot,isLoser=false)=>{
+      if(r){const fl=flag(r.team);const bg=r.isLeader?'background:rgba(22,163,74,.18);':r.isThird?'background:rgba(234,179,8,.12);':'';const loserStyle=isLoser?'filter:grayscale(1);opacity:0.38;':'';return `<div style="padding:4px 6px;display:flex;align-items:center;gap:5px;${bg}overflow:hidden;${loserStyle}"><div style="flex-shrink:0">${fl}</div><span style="font-size:9px;font-weight:500;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.team}</span></div>`;}
       return `<div style="padding:4px 6px"><span style="font-size:8px;color:rgba(255,255,255,.2)">${slot||'·'}</span></div>`;
     };
     const dynMatch2=(sH,sA,mid=null)=>{
       const rH=resolveRealSlot(sH,rs2,mid),rA=resolveRealSlot(sA,rs2,mid);
       const filled=rH||rA;
       const bg=rH?.isThird||rA?.isThird?'rgba(234,179,8,.1)':(filled?'rgba(255,255,255,.1)':'rgba(255,255,255,.05)');
-      return `<div style="background:${bg};border:0.5px solid ${filled?'rgba(255,255,255,.2)':'rgba(255,255,255,.08)'};border-radius:5px;overflow:hidden;width:110px">${mkTeam2(rH,sH)}<div style="height:0.5px;background:rgba(255,255,255,.1)"></div>${mkTeam2(rA,sA)}</div>`;
+      let hLose=false,aLose=false;
+      if(mid&&real[mid]){const rv=real[mid];if(rv.h>rv.a)aLose=true;else if(rv.a>rv.h)hLose=true;else if(rv.ph!==undefined){if(rv.ph>rv.pa)aLose=true;else hLose=true;}}
+      return `<div style="background:${bg};border:0.5px solid ${filled?'rgba(255,255,255,.2)':'rgba(255,255,255,.08)'};border-radius:5px;overflow:hidden;width:110px">${mkTeam2(rH,sH,hLose)}<div style="height:0.5px;background:rgba(255,255,255,.1)"></div>${mkTeam2(rA,sA,aLose)}</div>`;
     };
     const dynCol2=(lbl,sp,ms)=>`<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0"><div style="font-size:8px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.3);text-align:center;margin-bottom:3px">${lbl}</div>${sp?`<div style="height:${sp}px"></div>`:''}${ms}</div>`;
     const e=dynMatch2(null,null);
