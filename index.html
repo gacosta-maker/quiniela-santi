@@ -3480,11 +3480,36 @@ async function renderAdminPanel(){
       const groups=slot.slice(1).split('');
       const allDone=groups.every(g=>groupComplete(g));
       if(!allDone) return slot;
-      // Use pre-assigned thirds - find which slot this matchId corresponds to
-      // Find the correct slot assignment for this specific match
       return realThirdAssignments[matchId] || slot;
     }
     return slot;
+  }
+
+  // Resolve actual team name for Octavos/Cuartos/Semis/Final slots (Wm{id})
+  function resolveKOTeam(slot, contextMid, depth=0){
+    if(!slot||depth>8) return null;
+    if(/^[12][A-L]$/.test(slot)){
+      const pos=parseInt(slot[0])-1, g=slot[1];
+      const st=realStandings[g];
+      return st&&st[pos]&&st[pos].played>0?st[pos].team:null;
+    }
+    if(slot==='3r'&&contextMid){
+      return realThirdAssignments[contextMid]||null;
+    }
+    if(slot.startsWith('W')){
+      const mid=slot.slice(1);
+      const r=real[mid];
+      if(!r) return null;
+      const chain=BRACKET_CHAIN[mid];
+      if(!chain) return null;
+      let winSlot;
+      if(r.h>r.a) winSlot=chain.h;
+      else if(r.a>r.h) winSlot=chain.a;
+      else winSlot=r.ph!==undefined?(r.ph>r.pa?chain.h:chain.a):null;
+      if(!winSlot) return null;
+      return resolveKOTeam(winSlot, mid, depth+1);
+    }
+    return null;
   }
 
   // Group by round
@@ -3521,6 +3546,12 @@ async function renderAdminPanel(){
       if(m.phase==='r32'){
         const r32=R32_BRACKET.find(r=>r.id===m.id);
         if(r32){homeName=resolveReal(m.id,r32.t1);awayName=resolveReal(m.id,r32.t2);}
+      } else if(m.phase!=='g'){
+        const chain=BRACKET_CHAIN[m.id];
+        if(chain){
+          homeName=resolveKOTeam(chain.h,m.id)||m.home;
+          awayName=resolveKOTeam(chain.a,m.id)||m.away;
+        }
       }
       const homeFlag=flag(homeName);
       const awayFlag=flag(awayName);
