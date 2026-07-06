@@ -2691,22 +2691,18 @@ function calcOpportunities(preds, real) {
 function calcScore(preds,real){
   let pts=0,winner=0,exact=0;
 
-  // Pre-computar emparejamientos KO donde los equipos predichos coinciden con los reales
+  // Pre-computar emparejamientos KO usando getMatchTeams (resuelve Wm{id} recursivamente)
   const koTeamMatch=new Set();
-  const uSt=getAllStandings(preds),uBT=getBestThirds(uSt),uTA=assignThirdsToSlots(uBT);
-  const rSt=getAllStandings(real),rBT=getBestThirds(rSt),rTA=assignThirdsToSlots(rBT);
-  function rSlot(slot,st,ta,mid){
-    if(!slot)return null;
-    if(/^[12][A-L]$/.test(slot)){const pos=parseInt(slot[0])-1,g=slot[1];const s=st[g];return s&&s[pos]&&s[pos].played>0?s[pos].team:null;}
-    return slot==='3r'&&mid?ta[mid]||null:null;
+  if(Object.keys(real).length){
+    allMatches.filter(m=>m.phase!=='g').forEach(m=>{
+      const rTeams=getMatchTeams(m,real);
+      const uTeams=getMatchTeams(m,preds);
+      if(!rTeams||!uTeams)return;
+      const rH=rTeams.home,rA=rTeams.away,uH=uTeams.home,uA=uTeams.away;
+      if(!rH||!rA||!uH||!uA||rH==='?'||rA==='?'||uH==='?'||uA==='?')return;
+      if((rH===uH&&rA===uA)||(rH===uA&&rA===uH))koTeamMatch.add(m.id);
+    });
   }
-  allMatches.filter(m=>m.phase!=='g').forEach(m=>{
-    const chain=BRACKET_CHAIN[m.id];if(!chain)return;
-    const rH=rSlot(chain.h,rSt,rTA,m.id),rA=rSlot(chain.a,rSt,rTA,m.id);
-    const uH=rSlot(chain.h,uSt,uTA,m.id),uA=rSlot(chain.a,uSt,uTA,m.id);
-    if(!rH||!rA||!uH||!uA)return;
-    if((rH===uH&&rA===uA)||(rH===uA&&rA===uH))koTeamMatch.add(m.id);
-  });
 
   Object.entries(real).forEach(([mid,r])=>{
     const p=preds[mid];if(!p)return;
