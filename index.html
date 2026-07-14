@@ -465,6 +465,18 @@ nav{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px
 .winner-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,#92400e,#b45309);color:#fef3c7;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:3px 10px;border-radius:20px;border:1px solid rgba(234,179,8,.4)}
 @keyframes winnerPulse{0%,100%{opacity:1}50%{opacity:.7}}
 .winner-badge{animation:winnerPulse 2s ease-in-out infinite}
+#winnerOverlay{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;animation:fadeInOv .6s ease}
+@keyframes fadeInOv{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+@keyframes trophyBounce{0%,100%{transform:translateY(0) scale(1)}40%{transform:translateY(-18px) scale(1.08)}60%{transform:translateY(-8px) scale(1.04)}}
+@keyframes shimmer{0%{background-position:-200% center}100%{background-position:200% center}}
+.winner-trophy{font-size:90px;line-height:1;animation:trophyBounce 1.8s ease-in-out infinite;filter:drop-shadow(0 0 32px rgba(212,175,55,.7))}
+.winner-title{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:#d4af37;margin:12px 0 4px}
+.winner-name{font-size:38px;font-weight:800;background:linear-gradient(135deg,#fef3c7,#d4af37,#fbbf24);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:shimmer 2s linear infinite}
+.winner-pts{font-size:16px;color:rgba(255,255,255,.7);margin-top:6px}
+.winner-sub{font-size:12px;color:rgba(255,255,255,.35);margin-top:4px}
+.winner-btn{margin-top:28px;padding:12px 32px;border-radius:30px;background:linear-gradient(135deg,#d4af37,#92400e);color:#fff;border:none;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:1px;transition:.2s;box-shadow:0 4px 20px rgba(212,175,55,.4)}
+.winner-btn:hover{transform:translateY(-2px);box-shadow:0 6px 28px rgba(212,175,55,.5)}
+#confettiCanvas{position:fixed;inset:0;pointer-events:none;z-index:9998}
 .saved-card.active-card{border-color:var(--blue);background:rgba(26,95,175,.06)}
 .saved-card-teams{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
 .saved-card-team{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:52px}
@@ -2919,6 +2931,7 @@ window.loadRanking=async function(){
     window._rankPlayers=players;
     window._rankReal=real;
     document.getElementById("rankingContent").innerHTML=podiumHtml+infoHtml+rankHtml;
+    if(isConfirmedWinner&&leader) window.showWinnerCelebration(leader);
   }catch(e){
     console.error(e);
     document.getElementById("rankingContent").innerHTML='<div class="empty-state">Error al cargar el ranking.</div>';
@@ -3043,6 +3056,59 @@ window._drawEvolChart=function(cid,labels,rankData,players,N,COLORS,DASHES){
       }
     }
   });
+};
+
+window.showWinnerCelebration=function(player){
+  if(sessionStorage.getItem('q_winner_shown')) return;
+  sessionStorage.setItem('q_winner_shown','1');
+  // Create confetti canvas
+  const canvas=document.createElement('canvas');
+  canvas.id='confettiCanvas';
+  canvas.width=window.innerWidth; canvas.height=window.innerHeight;
+  document.body.appendChild(canvas);
+  const ctx=canvas.getContext('2d');
+  const COLORS=['#d4af37','#fbbf24','#0ea5e9','#8b5cf6','#ec4899','#10b981','#ef4444','#f97316'];
+  const parts=Array.from({length:180},()=>({
+    x:Math.random()*canvas.width, y:Math.random()*canvas.height-canvas.height,
+    w:Math.random()*12+5, h:Math.random()*6+3,
+    color:COLORS[Math.floor(Math.random()*COLORS.length)],
+    speed:Math.random()*4+2, wobble:Math.random()*3-1.5,
+    rot:Math.random()*360, rotV:Math.random()*8-4
+  }));
+  let frame, done=false;
+  function animConf(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    let allOut=true;
+    parts.forEach(p=>{
+      p.y+=p.speed; p.x+=p.wobble; p.rot+=p.rotV;
+      if(p.y<canvas.height+20) allOut=false;
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot*Math.PI/180);
+      ctx.fillStyle=p.color; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
+      ctx.restore();
+    });
+    if(!allOut&&!done) frame=requestAnimationFrame(animConf);
+    else{canvas.remove();}
+  }
+  animConf();
+  // Create overlay
+  const ov=document.createElement('div');
+  ov.id='winnerOverlay';
+  const pts=player.pts||0, exs=player.exact||0;
+  const avatar=player.foto?`<img src="${player.foto}" style="width:72px;height:72px;border-radius:50%;border:3px solid #d4af37;margin-bottom:8px;object-fit:cover">`:'';
+  ov.innerHTML=`<canvas id="confettiCanvas2" style="display:none"></canvas>
+    <div style="text-align:center;z-index:1;padding:24px;max-width:380px">
+      <div class="winner-trophy">🏆</div>
+      <div class="winner-title">¡Ganador matemático de la quiniela!</div>
+      ${avatar}
+      <div class="winner-name">${player.name||'Campeón'}</div>
+      <div class="winner-pts">${pts} puntos · ⭐ ${exs} exactos</div>
+      <div class="winner-sub">Nadie puede alcanzarle — ¡felicidades!</div>
+      <button class="winner-btn" onclick="document.getElementById('winnerOverlay').remove();cancelAnimationFrame(window._confFrame)">🎉 ¡Celebrar!</button>
+    </div>`;
+  document.body.appendChild(ov);
+  window._confFrame=frame;
+  // Auto-dismiss after 12s
+  setTimeout(()=>{ const o=document.getElementById('winnerOverlay'); if(o)o.remove(); const cv=document.getElementById('confettiCanvas'); if(cv)cv.remove(); },12000);
 };
 
 window.toggleDetail=function(id){
